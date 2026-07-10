@@ -35,11 +35,13 @@ final readonly class EdDSA implements Signer, Verifier
             throw UnsupportedAlgorithmException::sodiumMissing();
         }
 
-        if ($this->key->secretKey === null) {
+        $secretKey = $this->key->secretKey;
+
+        if ($secretKey === null || $secretKey === '') {
             throw KeyLoadException::signingFailed();
         }
 
-        return sodium_crypto_sign_detached($message, $this->key->secretKey);
+        return sodium_crypto_sign_detached($message, $secretKey);
     }
 
     /**

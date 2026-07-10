@@ -17,8 +17,14 @@ use SensitiveParameter;
  *
  * Only the Ed25519 curve is supported. Signing (and key generation) requires
  * ext-sodium; loading a public key and verifying does not.
+ *
+ * When ext-sodium is present the raw secret key is best-effort wiped from memory
+ * when the object is destroyed. PHP cannot guarantee wiping, so this is
+ * defence-in-depth, not a guarantee. The `secretKey` property is intentionally
+ * not `readonly`: a readonly string cannot be zeroed in place. The public key is
+ * not secret and stays readonly.
  */
-final readonly class OkpKey implements PublicKey
+final class OkpKey implements PublicKey
 {
     use ReadsKeyMaterial;
 
@@ -27,9 +33,8 @@ final readonly class OkpKey implements PublicKey
     private const int ED25519_SECRET_BYTES = 64;
 
     /** @var non-empty-string */
-    public string $publicKey;
+    public readonly string $publicKey;
 
-    /** @var non-empty-string|null */
     public ?string $secretKey;
 
     /**
@@ -40,6 +45,19 @@ final readonly class OkpKey implements PublicKey
     {
         $this->publicKey = $publicKey;
         $this->secretKey = $secretKey;
+    }
+
+    /**
+     * Best-effort wipe of the raw Ed25519 secret key when ext-sodium is
+     * available. PHP cannot guarantee memory wiping; this only reduces the window
+     * the secret lingers. (OpenSSL key handles elsewhere are opaque and cannot be
+     * wiped this way.)
+     */
+    public function __destruct()
+    {
+        if ($this->secretKey !== null) {
+            self::wipeSecret($this->secretKey);
+        }
     }
 
     /**

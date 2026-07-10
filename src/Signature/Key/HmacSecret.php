@@ -22,14 +22,28 @@ use SensitiveParameter;
  * secret is rejected as obviously low-entropy. The length guard measures bytes,
  * not entropy — it is not a proof of randomness — so the value MUST be at least
  * 32 *random* bytes (generate one with the CSPRNG factory below).
+ *
+ * When ext-sodium is present the raw secret is best-effort wiped from memory when
+ * the object is destroyed. PHP cannot guarantee wiping (copy-on-write may leave
+ * other copies), so this is defence-in-depth, not a guarantee. The property is
+ * intentionally not `readonly`: a readonly string cannot be zeroed in place.
  */
-final readonly class HmacSecret
+final class HmacSecret
 {
     use ReadsKeyMaterial;
 
     private const int MIN_BYTES = 32;
 
     private function __construct(public string $value) {}
+
+    /**
+     * Best-effort wipe of the raw secret when ext-sodium is available. PHP cannot
+     * guarantee memory wiping; this only reduces the window a secret lingers.
+     */
+    public function __destruct()
+    {
+        self::wipeSecret($this->value);
+    }
 
     /**
      * @throws WeakKeyException

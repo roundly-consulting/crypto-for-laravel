@@ -6,6 +6,7 @@ namespace RoundlyConsulting\Crypto\Signature\Key;
 
 use Illuminate\Support\Facades\Storage;
 use RoundlyConsulting\Crypto\Signature\KeyLoadException;
+use SensitiveParameter;
 
 /**
  * Shared plumbing for the opt-in Laravel loading factories (`fromStorage`,
@@ -63,5 +64,25 @@ trait ReadsKeyMaterial
     protected static function persistPrivate(string $disk, string $path, string $contents): void
     {
         Storage::disk($disk)->put($path, $contents, 'private');
+    }
+
+    /**
+     * Best-effort in-place wipe of a raw secret string when ext-sodium is
+     * available. Passed by reference so the caller's own buffer is zeroed; PHP
+     * cannot guarantee wiping (copy-on-write may leave other copies), so this is
+     * defence-in-depth, not a guarantee.
+     */
+    protected static function wipeSecret(#[SensitiveParameter] string &$secret): void
+    {
+        if (! function_exists('sodium_memzero')) {
+            return;
+        }
+
+        // Called through a plain callable so the wipe operates on our own buffer
+        // without leaking sodium_memzero's "variable becomes null" semantics into
+        // the non-nullable secret properties this zeroes.
+        /** @var callable(string): void $memzero */
+        $memzero = 'sodium_memzero';
+        $memzero($secret);
     }
 }
