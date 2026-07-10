@@ -8,13 +8,13 @@ use RoundlyConsulting\Crypto\Cose\UnsupportedAlgorithmException;
 use RoundlyConsulting\Crypto\Signature\Key\OkpKey;
 
 /**
- * EdDSA (Ed25519) signature verification via ext-sodium.
+ * EdDSA (Ed25519) signer and verifier via ext-sodium.
  *
- * Verification only: signing is intentionally out of scope (see the package's
- * sodium-optional posture). When sodium is unavailable, verification throws
- * {@see UnsupportedAlgorithmException} rather than silently passing.
+ * Verification needs only the public key; signing needs a key carrying the
+ * secret half. When sodium is unavailable, both throw
+ * {@see UnsupportedAlgorithmException} rather than silently degrading.
  */
-final readonly class EdDSA implements Verifier
+final readonly class EdDSA implements Signer, Verifier
 {
     private const int SIGNATURE_BYTES = 64;
 
@@ -23,6 +23,23 @@ final readonly class EdDSA implements Verifier
     public function algorithm(): Algorithm
     {
         return Algorithm::EdDSA;
+    }
+
+    /**
+     * @throws UnsupportedAlgorithmException when ext-sodium is not loaded
+     * @throws KeyLoadException when the key has no secret half to sign with
+     */
+    public function sign(string $message): string
+    {
+        if (! function_exists('sodium_crypto_sign_detached')) {
+            throw UnsupportedAlgorithmException::sodiumMissing();
+        }
+
+        if ($this->key->secretKey === null) {
+            throw KeyLoadException::signingFailed();
+        }
+
+        return sodium_crypto_sign_detached($message, $this->key->secretKey);
     }
 
     /**

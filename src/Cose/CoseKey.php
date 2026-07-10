@@ -14,10 +14,21 @@ use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
  *
  * COSE_Key labels (RFC 9052 / RFC 9053): 1 = kty, 3 = alg, -1 = crv (EC/OKP) or
  * n (RSA), -2 = x or e (RSA), -3 = y. kty: 1 = OKP, 2 = EC2, 3 = RSA.
- * crv: 1 = P-256, 6 = Ed25519.
+ * crv: 1 = P-256, 2 = P-384, 3 = P-521, 6 = Ed25519.
  */
 final class CoseKey
 {
+    /**
+     * COSE EC2 curve label → [our curve label, the ES* algorithm it requires].
+     *
+     * @var array<int, array{string, CoseAlgorithm}>
+     */
+    private const array EC2_CURVES = [
+        1 => ['P-256', CoseAlgorithm::ES256],
+        2 => ['P-384', CoseAlgorithm::ES384],
+        3 => ['P-521', CoseAlgorithm::ES512],
+    ];
+
     /**
      * @param  array<int|string, mixed>  $cose
      *
@@ -41,19 +52,19 @@ final class CoseKey
      */
     private static function ec2(array $cose, CoseAlgorithm $algorithm): EcKey
     {
-        if ($algorithm !== CoseAlgorithm::ES256) {
-            throw UnsupportedAlgorithmException::forId($algorithm->value);
-        }
-
         $curve = self::int($cose, -1, 'crv');
 
-        if ($curve !== 1) {
-            throw UnsupportedAlgorithmException::curve($curve);
+        [$curveLabel, $expectedAlgorithm] = self::EC2_CURVES[$curve]
+            ?? throw UnsupportedAlgorithmException::curve($curve);
+
+        if ($algorithm !== $expectedAlgorithm) {
+            throw UnsupportedAlgorithmException::forId($algorithm->value);
         }
 
         return EcKey::fromCoordinates(
             self::bytes($cose, -2, 'x'),
             self::bytes($cose, -3, 'y'),
+            $curveLabel,
         );
     }
 

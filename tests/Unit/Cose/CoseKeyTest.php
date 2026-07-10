@@ -17,6 +17,27 @@ it('parses each supported COSE key type', function (string $name, Algorithm $alg
     'EdDSA' => ['eddsa', Algorithm::EdDSA],
 ]);
 
+it('parses P-384 and P-521 EC2 keys from committed coordinates', function (string $name, int $crv, int $alg, Algorithm $algorithm): void {
+    $vector = cryptoVectors()[$name];
+    $key = CoseKey::fromDecoded([
+        1 => 2,
+        3 => $alg,
+        -1 => $crv,
+        -2 => hex2bin($vector['x']),
+        -3 => hex2bin($vector['y']),
+    ]);
+
+    expect($key->algorithm())->toBe($algorithm)
+        ->and((new RoundlyConsulting\Crypto\Signature\KeyVerifier)->verify($key, hex2bin($vector['message']), hex2bin($vector['sig_raw'])))->toBeTrue();
+})->with([
+    'ES384/P-384' => ['es384', 2, -35, Algorithm::ES384],
+    'ES512/P-521' => ['es512', 3, -36, Algorithm::ES512],
+]);
+
+it('rejects a P-384 key presented with the ES256 algorithm', function (): void {
+    CoseKey::fromDecoded([1 => 2, 3 => -7, -1 => 2, -2 => str_repeat("\x01", 48), -3 => str_repeat("\x02", 48)]);
+})->throws(UnsupportedAlgorithmException::class);
+
 it('rejects an unknown COSE algorithm identifier', function (): void {
     CoseKey::fromDecoded([1 => 2, 3 => -999, -1 => 1, -2 => str_repeat("\x01", 32), -3 => str_repeat("\x02", 32)]);
 })->throws(UnsupportedAlgorithmException::class);

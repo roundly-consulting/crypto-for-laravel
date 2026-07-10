@@ -30,6 +30,20 @@ it('generates a usable EC private key', function (): void {
         ->and((new Es($public))->verify('message', $sig))->toBeTrue();
 });
 
+it('generates a usable EC private key on higher curves', function (string $curve, Algorithm $algorithm, int $length): void {
+    $key = EcKey::generate($curve);
+    $public = EcKey::public((string) openssl_pkey_get_details($key->key)['key']);
+    $sig = (new Es($key))->sign('message');
+
+    expect($key->algorithm())->toBe($algorithm)
+        ->and($key->curve)->toBe($curve)
+        ->and(strlen($sig))->toBe($length)
+        ->and((new Es($public))->verify('message', $sig))->toBeTrue();
+})->with([
+    'P-384' => ['P-384', Algorithm::ES384, 96],
+    'P-521' => ['P-521', Algorithm::ES512, 132],
+]);
+
 it('rejects an unreadable RSA private PEM', function (): void {
     RsaKey::private('not a private key');
 })->throws(KeyLoadException::class);

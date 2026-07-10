@@ -20,6 +20,16 @@ it('produces the known RFC 4231 SHA-256 test vector', function (): void {
     expect($sig)->toBe('b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7');
 });
 
+it('produces the known RFC 4231 SHA-384 and SHA-512 test vectors', function (): void {
+    // RFC 4231 test case 1: key of 20 × 0x0b, data "Hi There".
+    $key = str_repeat("\x0b", 20);
+
+    expect((new Hmac(HashAlgorithm::Sha384))->signHex('Hi There', $key))
+        ->toBe('afd03944d84895626b0825f4ab46907f15f9dadbe4101ec682aa034c7cebc59cfaea9ea9076ede7f4af152e8b2fa9cb6')
+        ->and((new Hmac(HashAlgorithm::Sha512))->signHex('Hi There', $key))
+        ->toBe('87aa7cdea5ef619d4ff0b4241a1d6cb02379f4e2ce4ec2787ad0b30545e17cdedaa833b7d6b8a702038b274eaea3f4e4be9d914eeb61f1702e696c203a126854');
+});
+
 it('rejects a tampered signature', function (): void {
     $hmac = new Hmac;
     $sig = $hmac->sign('payload', 'secret-key');

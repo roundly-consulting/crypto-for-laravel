@@ -18,18 +18,17 @@ final class Asn1
     // Pre-encoded DER for the algorithm-identifier OIDs (fixed byte templates).
     private const string OID_EC_PUBLIC_KEY = "\x06\x07\x2A\x86\x48\xCE\x3D\x02\x01";
 
-    private const string OID_PRIME256V1 = "\x06\x08\x2A\x86\x48\xCE\x3D\x03\x01\x07";
-
     private const string OID_RSA_ENCRYPTION = "\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x01\x01";
 
     private const string DER_NULL = "\x05\x00";
 
     /**
-     * Assemble an EC (prime256v1) public key PEM from a 65-byte uncompressed point.
+     * Assemble an EC public key PEM from an uncompressed point and the DER-encoded
+     * named-curve OID (P-256 / P-384 / P-521).
      */
-    public static function ecPublicKeyPem(string $uncompressedPoint): string
+    public static function ecPublicKeyPem(string $uncompressedPoint, string $curveOid): string
     {
-        $algorithm = self::sequence(self::OID_EC_PUBLIC_KEY.self::OID_PRIME256V1);
+        $algorithm = self::sequence(self::OID_EC_PUBLIC_KEY.$curveOid);
         $spki = self::sequence($algorithm.self::bitString($uncompressedPoint));
 
         return self::pem($spki);

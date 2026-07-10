@@ -22,6 +22,11 @@ final class KeyLoadException extends CryptoException
         return new self("The {$kind} key is not an {$expected} key.");
     }
 
+    public static function unsupportedCurve(string $curve): self
+    {
+        return new self("The EC curve [{$curve}] is not supported.");
+    }
+
     public static function generationFailed(): self
     {
         return new self('Key generation failed.');

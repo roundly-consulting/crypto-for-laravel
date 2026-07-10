@@ -50,6 +50,47 @@ it('signs and verifies RS256 and ES256 round-trips', function (): void {
     expect($jws->verify($es, new Es(EcKey::public(keyPem('ec-public'))), Algorithm::ES256)->string('sub'))->toBe('e');
 });
 
+it('signs and verifies the full SHA-2 signature tier', function (Algorithm $algorithm): void {
+    $jws = new Jws;
+    $secret = HmacSecret::fromString('0123456789abcdef0123456789abcdef!');
+    $signer = new Hs($secret, $algorithm);
+
+    $compact = $jws->sign([], ['sub' => 'x'], $signer);
+
+    expect($jws->verify($compact, new Hs($secret, $algorithm), $algorithm)->string('sub'))->toBe('x');
+})->with([
+    'HS384' => [Algorithm::HS384],
+    'HS512' => [Algorithm::HS512],
+]);
+
+it('pins HS512 and rejects an HS512 token presented to an HS256 verifier', function (): void {
+    $secret = HmacSecret::fromString('0123456789abcdef0123456789abcdef!');
+    $compact = (new Jws)->sign([], ['sub' => 'x'], new Hs($secret, Algorithm::HS512));
+
+    (new Jws)->verify($compact, new Hs($secret, Algorithm::HS256), Algorithm::HS256);
+})->throws(AlgorithmMismatchException::class);
+
+it('signs and verifies RS512 and ES512 compact tokens', function (): void {
+    $jws = new Jws;
+
+    $rs = $jws->sign([], ['sub' => 'r'], new Rs(RsaKey::private(keyPem('rsa-private')), Algorithm::RS512));
+    expect($jws->verify($rs, new Rs(RsaKey::public(keyPem('rsa-public')), Algorithm::RS512), Algorithm::RS512)->string('sub'))->toBe('r');
+
+    $ec = EcKey::generate('P-521');
+    $public = EcKey::public((string) openssl_pkey_get_details($ec->key)['key']);
+    $es = $jws->sign([], ['sub' => 'e'], new Es($ec));
+    expect($jws->verify($es, new Es($public), Algorithm::ES512)->string('sub'))->toBe('e');
+});
+
+it('signs and verifies an EdDSA compact JWS', function (): void {
+    $jws = new Jws;
+    $key = RoundlyConsulting\Crypto\Signature\Key\OkpKey::generate();
+
+    $compact = $jws->sign([], ['sub' => 'ed'], new RoundlyConsulting\Crypto\Signature\EdDSA($key));
+
+    expect($jws->verify($compact, new RoundlyConsulting\Crypto\Signature\EdDSA($key), Algorithm::EdDSA)->string('sub'))->toBe('ed');
+})->skip(fn (): bool => ! function_exists('sodium_crypto_sign_detached'), 'ext-sodium not loaded');
+
 it('verifies the RFC 7515 A.1 HS256 vector', function (): void {
     $vector = jsonFixture('hs256-rfc7515-a1.json');
     $key = HmacSecret::fromString(Base64Url::decode($vector['hmac_key_b64url']));

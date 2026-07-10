@@ -20,30 +20,53 @@ function strongSecret(): HmacSecret
 }
 
 describe('Hs', function (): void {
-    it('signs and verifies HS256', function (): void {
-        $hs = new Hs(strongSecret());
+    it('signs and verifies each HMAC tier', function (Algorithm $algorithm, int $length): void {
+        $hs = new Hs(strongSecret(), $algorithm);
         $sig = $hs->sign('message');
 
-        expect($hs->algorithm())->toBe(Algorithm::HS256)
+        expect($hs->algorithm())->toBe($algorithm)
+            ->and(strlen($sig))->toBe($length)
             ->and($hs->verify('message', $sig))->toBeTrue()
             ->and($hs->verify('tampered', $sig))->toBeFalse();
-    });
+    })->with([
+        'HS256' => [Algorithm::HS256, 32],
+        'HS384' => [Algorithm::HS384, 48],
+        'HS512' => [Algorithm::HS512, 64],
+    ]);
 
-    it('rejects construction for a non-HS algorithm', function (): void {
-        new Hs(strongSecret(), Algorithm::RS256);
-    })->throws(AlgorithmMismatchException::class);
+    it('rejects construction for a non-HS algorithm', function (Algorithm $algorithm): void {
+        new Hs(strongSecret(), $algorithm);
+    })->with([
+        'RS256' => [Algorithm::RS256],
+        'ES256' => [Algorithm::ES256],
+        'EdDSA' => [Algorithm::EdDSA],
+    ])->throws(AlgorithmMismatchException::class);
 });
 
 describe('Rs', function (): void {
-    it('signs with a private key and verifies with the public key', function (): void {
-        $signer = new Rs(RsaKey::private(keyPem('rsa-private')));
-        $verifier = new Rs(RsaKey::public(keyPem('rsa-public')));
+    it('signs and verifies each RSA tier', function (Algorithm $algorithm): void {
+        $signer = new Rs(RsaKey::private(keyPem('rsa-private')), $algorithm);
+        $verifier = new Rs(RsaKey::public(keyPem('rsa-public')), $algorithm);
         $sig = $signer->sign('message');
 
-        expect($signer->algorithm())->toBe(Algorithm::RS256)
+        expect($signer->algorithm())->toBe($algorithm)
             ->and($verifier->verify('message', $sig))->toBeTrue()
             ->and($verifier->verify('tampered', $sig))->toBeFalse();
+    })->with([
+        'RS256' => [Algorithm::RS256],
+        'RS384' => [Algorithm::RS384],
+        'RS512' => [Algorithm::RS512],
+    ]);
+
+    it('does not cross-verify across RSA tiers', function (): void {
+        $sig = (new Rs(RsaKey::private(keyPem('rsa-private')), Algorithm::RS512))->sign('message');
+
+        expect((new Rs(RsaKey::public(keyPem('rsa-public')), Algorithm::RS256))->verify('message', $sig))->toBeFalse();
     });
+
+    it('rejects construction for a non-RSA algorithm', function (): void {
+        new Rs(RsaKey::public(keyPem('rsa-public')), Algorithm::ES256);
+    })->throws(AlgorithmMismatchException::class);
 
     it('refuses to sign with a public-only key', function (): void {
         (new Rs(RsaKey::public(keyPem('rsa-public'))))->sign('message');
@@ -66,12 +89,27 @@ describe('Es', function (): void {
             ->and($verifier->verify('tampered', $sig))->toBeFalse();
     });
 
-    it('verifies the committed ES256 vector', function (): void {
-        $es256 = cryptoVectors()['es256'];
-        $verifier = new Es(EcKey::public($es256['public_pem']));
+    it('signs and verifies ES384 and ES512 round-trips on a generated key', function (string $curve, Algorithm $algorithm, int $length): void {
+        $key = EcKey::generate($curve);
+        $public = EcKey::public((string) openssl_pkey_get_details($key->key)['key']);
+        $sig = (new Es($key))->sign('message');
 
-        expect($verifier->verify(hex2bin($es256['message']), hex2bin($es256['sig_raw'])))->toBeTrue();
-    });
+        expect((new Es($key))->algorithm())->toBe($algorithm)
+            ->and(strlen($sig))->toBe($length)
+            ->and((new Es($public))->verify('message', $sig))->toBeTrue()
+            ->and((new Es($public))->verify('tampered', $sig))->toBeFalse();
+    })->with([
+        'ES384' => ['P-384', Algorithm::ES384, 96],
+        'ES512' => ['P-521', Algorithm::ES512, 132],
+    ]);
+
+    it('verifies each committed ES vector', function (string $name): void {
+        $vector = cryptoVectors()[$name];
+        $verifier = new Es(EcKey::public($vector['public_pem']));
+
+        expect($verifier->verify(hex2bin($vector['message']), hex2bin($vector['sig_raw'])))->toBeTrue()
+            ->and($verifier->verify('tampered', hex2bin($vector['sig_raw'])))->toBeFalse();
+    })->with(['es256', 'es384', 'es512']);
 
     it('refuses to sign with a public-only key', function (): void {
         (new Es(EcKey::public(keyPem('ec-public'))))->sign('message');
@@ -107,4 +145,33 @@ describe('EdDSA', function (): void {
 
         expect($verifier->verify(hex2bin($eddsa['message']), 'short'))->toBeFalse();
     });
+
+    it('signs and verifies with a generated Ed25519 key', function (): void {
+        $key = OkpKey::generate();
+        $eddsa = new EdDSA($key);
+        $sig = $eddsa->sign('message');
+
+        expect($eddsa->algorithm())->toBe(Algorithm::EdDSA)
+            ->and(strlen($sig))->toBe(64)
+            ->and($eddsa->verify('message', $sig))->toBeTrue()
+            ->and($eddsa->verify('tampered', $sig))->toBeFalse();
+    });
+
+    it('signs with a key restored from its secret key', function (): void {
+        $generated = OkpKey::generate();
+        $restored = OkpKey::fromSecretKey((string) $generated->secretKey);
+        $sig = (new EdDSA($restored))->sign('message');
+
+        expect($restored->publicKey)->toBe($generated->publicKey)
+            ->and((new EdDSA(OkpKey::ed25519($generated->publicKey)))->verify('message', $sig))->toBeTrue();
+    });
+
+    it('refuses to sign with a public-only key', function (): void {
+        $eddsa = cryptoVectors()['eddsa'];
+        (new EdDSA(OkpKey::ed25519(hex2bin($eddsa['public_raw']))))->sign('message');
+    })->throws(KeyLoadException::class);
+
+    it('rejects a secret key of the wrong length', function (): void {
+        OkpKey::fromSecretKey('short');
+    })->throws(KeyLoadException::class);
 })->skip(fn (): bool => ! function_exists('sodium_crypto_sign_verify_detached'), 'ext-sodium not loaded');

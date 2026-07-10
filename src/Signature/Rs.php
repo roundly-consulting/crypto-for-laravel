@@ -7,15 +7,25 @@ namespace RoundlyConsulting\Crypto\Signature;
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
 
 /**
- * RSASSA-PKCS1-v1_5 with SHA-256 (RS256) signer and verifier via ext-openssl.
+ * RSASSA-PKCS1-v1_5 signer and verifier (RS256/RS384/RS512) via ext-openssl.
+ *
+ * The digest tier is fixed at construction and pinned per call; the key itself
+ * is tier-agnostic (any RSA key of at least 2048 bits works with any RS*).
  */
 final readonly class Rs implements Signer, Verifier
 {
-    public function __construct(private RsaKey $key) {}
+    public function __construct(
+        private RsaKey $key,
+        private Algorithm $algorithm = Algorithm::RS256,
+    ) {
+        if (! self::isRsaAlgorithm($algorithm)) {
+            throw AlgorithmMismatchException::keyForAlgorithm($algorithm);
+        }
+    }
 
     public function algorithm(): Algorithm
     {
-        return Algorithm::RS256;
+        return $this->algorithm;
     }
 
     /**
@@ -27,27 +37,19 @@ final readonly class Rs implements Signer, Verifier
             throw KeyLoadException::signingFailed();
         }
 
-        $signature = '';
-
-        if (openssl_sign($message, $signature, $this->key->key, OPENSSL_ALGO_SHA256) === false) {
-            OpenSsl::drainErrors();
-
-            throw KeyLoadException::signingFailed();
-        }
-
-        return $signature;
+        return OpenSsl::sign($message, $this->key->key, $this->algorithm->opensslAlgorithm());
     }
 
     public function verify(string $message, string $signature): bool
     {
-        // The signature is attacker-controlled, so a malformed one must fail
-        // quietly rather than surface a PHP warning. Only an exact 1 passes.
-        $result = @openssl_verify($message, $signature, $this->key->key, OPENSSL_ALGO_SHA256);
+        return OpenSsl::verify($message, $signature, $this->key->key, $this->algorithm->opensslAlgorithm());
+    }
 
-        if ($result === -1) {
-            OpenSsl::drainErrors();
-        }
-
-        return $result === 1;
+    private static function isRsaAlgorithm(Algorithm $algorithm): bool
+    {
+        return match ($algorithm) {
+            Algorithm::RS256, Algorithm::RS384, Algorithm::RS512 => true,
+            default => false,
+        };
     }
 }

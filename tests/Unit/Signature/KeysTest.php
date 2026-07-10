@@ -66,6 +66,15 @@ describe('RsaKey', function (): void {
         RsaKey::fromModulusExponent('', '');
     })->throws(KeyLoadException::class);
 
+    it('encodes an all-zero integer as a single zero byte in the SPKI', function (): void {
+        // Exercises the ASN.1 minimal-integer path for a value that is all zero
+        // bytes; the assembled PEM is still well-formed even if OpenSSL later
+        // rejects a zero exponent as a key.
+        $pem = RoundlyConsulting\Crypto\Signature\Key\Asn1::rsaPublicKeyPem(str_repeat("\x01", 256), "\x00\x00");
+
+        expect($pem)->toStartWith('-----BEGIN PUBLIC KEY-----');
+    });
+
     it('rejects generating below 2048 bits', function (): void {
         RsaKey::generate(1024);
     })->throws(WeakKeyException::class);
@@ -87,11 +96,26 @@ describe('EcKey', function (): void {
 
         $key = EcKey::fromCoordinates($decoded[-2], $decoded[-3]);
 
-        expect($key->algorithm())->toBe(Algorithm::ES256);
+        expect($key->algorithm())->toBe(Algorithm::ES256)
+            ->and($key->coordinateBytes())->toBe(32)
+            ->and($key->curve)->toBe('P-256');
     });
 
+    it('builds P-384 and P-521 keys from coordinates and detects the curve on load', function (string $name, string $curve, Algorithm $algorithm, int $bytes): void {
+        $vector = cryptoVectors()[$name];
+        $key = EcKey::fromCoordinates(hex2bin($vector['x']), hex2bin($vector['y']), $curve);
+
+        expect($key->algorithm())->toBe($algorithm)
+            ->and($key->coordinateBytes())->toBe($bytes)
+            ->and($key->curve)->toBe($curve)
+            ->and(EcKey::public($vector['public_pem'])->curve)->toBe($curve);
+    })->with([
+        'P-384' => ['es384', 'P-384', Algorithm::ES384, 48],
+        'P-521' => ['es512', 'P-521', Algorithm::ES512, 66],
+    ]);
+
     it('rejects an unsupported curve', function (): void {
-        EcKey::fromCoordinates(str_repeat("\x01", 32), str_repeat("\x02", 32), 'P-384');
+        EcKey::fromCoordinates(str_repeat("\x01", 32), str_repeat("\x02", 32), 'secp256k1');
     })->throws(WeakKeyException::class);
 
     it('rejects coordinates of the wrong length', function (): void {
@@ -106,8 +130,17 @@ describe('EcKey', function (): void {
         EcKey::public(keyPem('rsa-public'));
     })->throws(KeyLoadException::class);
 
+    it('rejects a loaded key on an unsupported curve', function (): void {
+        // A real EC key on secp256k1 is a valid EC key OpenSSL will load, but not
+        // one of the three JOSE curves — the load must fail with a typed error.
+        $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'secp256k1']);
+        $pem = (string) openssl_pkey_get_details($key)['key'];
+
+        EcKey::public($pem);
+    })->throws(KeyLoadException::class);
+
     it('rejects generating on an unsupported curve', function (): void {
-        EcKey::generate('P-521');
+        EcKey::generate('secp256k1');
     })->throws(WeakKeyException::class);
 
     it('exposes a bound ES256 verifier', function (): void {
@@ -121,10 +154,18 @@ describe('OkpKey', function (): void {
 
         expect($key->algorithm())->toBe(Algorithm::EdDSA)
             ->and($key->publicKey)->toHaveLength(32)
+            ->and($key->secretKey)->toBeNull()
             ->and($key->verifier()->algorithm())->toBe(Algorithm::EdDSA);
     });
 
     it('rejects a key that is not 32 bytes', function (): void {
         OkpKey::ed25519('short');
     })->throws(KeyLoadException::class);
+
+    it('generates a keypair carrying both halves', function (): void {
+        $key = OkpKey::generate();
+
+        expect(strlen($key->publicKey))->toBe(32)
+            ->and(strlen((string) $key->secretKey))->toBe(64);
+    })->skip(fn (): bool => ! function_exists('sodium_crypto_sign_keypair'), 'ext-sodium not loaded');
 });

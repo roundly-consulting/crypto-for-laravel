@@ -23,7 +23,7 @@ final class KeyVerifier
     public function verify(PublicKey $key, string $message, string $signature): bool
     {
         if ($key instanceof EcKey) {
-            $signature = $this->normaliseEcdsa($signature);
+            $signature = $this->normaliseEcdsa($signature, $key->coordinateBytes());
 
             if ($signature === null) {
                 return false;
@@ -35,18 +35,19 @@ final class KeyVerifier
 
     /**
      * Normalise an ECDSA signature to the raw `r‖s` form {@see Es} expects,
-     * accepting DER (WebAuthn) or an already-raw 64-byte value.
+     * accepting DER (WebAuthn) or an already-raw value at the key's own
+     * coordinate size.
      */
-    private function normaliseEcdsa(string $signature): ?string
+    private function normaliseEcdsa(string $signature, int $coordinateBytes): ?string
     {
         if (Der::isValid($signature)) {
             try {
-                return Der::toRaw($signature);
+                return Der::toRaw($signature, $coordinateBytes);
             } catch (InvalidSignatureException) {
                 return null;
             }
         }
 
-        return strlen($signature) === 64 ? $signature : null;
+        return strlen($signature) === $coordinateBytes * 2 ? $signature : null;
     }
 }

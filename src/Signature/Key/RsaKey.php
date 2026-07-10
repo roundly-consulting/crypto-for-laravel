@@ -95,16 +95,10 @@ final readonly class RsaKey implements PublicKey
             throw WeakKeyException::rsaTooSmall($bits);
         }
 
-        $key = openssl_pkey_new([
+        $key = OpenSsl::generateKey([
             'private_key_type' => OPENSSL_KEYTYPE_RSA,
             'private_key_bits' => $bits,
         ]);
-
-        if ($key === false) {
-            OpenSsl::drainErrors();
-
-            throw KeyLoadException::generationFailed();
-        }
 
         return new self($key, true);
     }

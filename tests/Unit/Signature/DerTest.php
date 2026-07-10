@@ -54,6 +54,29 @@ it('converts a real openssl DER signature to the JOSE raw form', function (): vo
         ->and(strlen(Der::toRaw(hex2bin($es256['sig_der']))))->toBe(64);
 });
 
+it('round-trips 48-byte (P-384) coordinates', function (): void {
+    $raw = random_bytes(96);
+    $raw[0] = "\x7f";
+    $raw[48] = "\x7f";
+
+    expect(Der::toRaw(Der::fromRaw($raw, 48), 48))->toBe($raw);
+});
+
+it('round-trips 66-byte (P-521) coordinates including leading-zero padding', function (): void {
+    // P-521 r/s routinely carry leading zero bytes; the codec must re-pad to 66.
+    $raw = str_repeat("\x00", 2)."\x7f".random_bytes(63).str_repeat("\x00", 3)."\x01".random_bytes(62);
+
+    expect(strlen($raw))->toBe(132)
+        ->and(Der::toRaw(Der::fromRaw($raw, 66), 66))->toBe($raw);
+});
+
+it('round-trips the committed P-521 signature (high-bit and leading-zero limbs)', function (): void {
+    $raw = hex2bin(cryptoVectors()['es512']['sig_raw']);
+
+    expect(Der::isValid(Der::fromRaw($raw, 66)))->toBeTrue()
+        ->and(Der::toRaw(Der::fromRaw($raw, 66), 66))->toBe($raw);
+});
+
 it('rejects a raw signature of the wrong length', function (): void {
     Der::fromRaw('too short');
 })->throws(InvalidSignatureException::class);
@@ -94,4 +117,8 @@ it('reports malformed DER as invalid', function (string $der): void {
     'non-minimal integer' => ["\x30\x08\x02\x02\x00\x01\x02\x02\x00\x01"],
     'trailing bytes' => ["\x30\x06\x02\x01\x01\x02\x01\x01\xff"],
     'negative integer' => ["\x30\x06\x02\x01\x80\x02\x01\x01"],
+    'first element is not an integer' => ["\x30\x06\x03\x01\x01\x02\x01\x01"],
+    'zero-length integer' => ["\x30\x06\x02\x00\x02\x02\x01\x01"],
+    'oversized long-form length' => ["\x30\x85\x01\x01\x01\x01\x01\x01"],
+    'indefinite long-form length' => ["\x30\x80\x02\x01\x01\x02\x01\x01"],
 ]);
