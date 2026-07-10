@@ -26,6 +26,11 @@ final class InvalidEncodingException extends CryptoException
         return new self("The value contains a character outside the base32 alphabet: [{$character}].");
     }
 
+    public static function nonCanonicalBase32(): self
+    {
+        return new self('The base32 value has a non-zero sub-byte remainder and is not canonical.');
+    }
+
     public static function hex(): self
     {
         return new self('The value is not valid hexadecimal.');
