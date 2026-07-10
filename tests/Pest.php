@@ -6,6 +6,10 @@ use RoundlyConsulting\Crypto\Tests\TestCase;
 
 uses(TestCase::class)->in(__DIR__);
 
+// Load the opt-in expectations the package ships for consumers, exactly as a
+// consumer would from their own tests/Pest.php, so they are exercised here too.
+require __DIR__.'/../src/Testing/pest-expectations.php';
+
 /**
  * Read a raw fixture file from tests/Fixtures.
  */

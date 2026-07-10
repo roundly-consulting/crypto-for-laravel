@@ -23,5 +23,10 @@
         <include>
             <directory suffix=".php">src</directory>
         </include>
+        <exclude>
+            <!-- Opt-in, non-autoloaded Pest expectations for consumers; wired in
+                 from a consumer's own tests/Pest.php, not package runtime code. -->
+            <file>src/Testing/pest-expectations.php</file>
+        </exclude>
     </source>
 </phpunit>
