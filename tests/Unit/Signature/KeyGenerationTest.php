@@ -5,9 +5,11 @@ declare(strict_types=1);
 use RoundlyConsulting\Crypto\Signature\Algorithm;
 use RoundlyConsulting\Crypto\Signature\Es;
 use RoundlyConsulting\Crypto\Signature\Key\EcKey;
+use RoundlyConsulting\Crypto\Signature\Key\HmacSecret;
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
 use RoundlyConsulting\Crypto\Signature\KeyLoadException;
 use RoundlyConsulting\Crypto\Signature\Rs;
+use RoundlyConsulting\Crypto\Signature\WeakKeyException;
 
 it('generates a usable RSA private key', function (): void {
     $key = RsaKey::generate(2048);
@@ -43,6 +45,18 @@ it('generates a usable EC private key on higher curves', function (string $curve
     'P-384' => ['P-384', Algorithm::ES384, 96],
     'P-521' => ['P-521', Algorithm::ES512, 132],
 ]);
+
+it('rejects generating an RSA key above the bit ceiling', function (): void {
+    RsaKey::generate(8192 + 256);
+})->throws(WeakKeyException::class);
+
+it('rejects generating an HMAC secret above the byte ceiling', function (): void {
+    HmacSecret::generate(1025);
+})->throws(WeakKeyException::class);
+
+it('generates an HMAC secret at the byte ceiling', function (): void {
+    expect(strlen(HmacSecret::generate(1024)->value))->toBe(1024);
+});
 
 it('rejects an unreadable RSA private PEM', function (): void {
     RsaKey::private('not a private key');

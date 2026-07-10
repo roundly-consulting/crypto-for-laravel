@@ -18,6 +18,14 @@ it('rejects a non-positive byte length', function (): void {
     Bytes::generate(0);
 })->throws(InvalidLengthException::class);
 
+it('rejects a byte length above the maximum', function (): void {
+    Bytes::generate(Bytes::MAXIMUM_LENGTH + 1);
+})->throws(InvalidLengthException::class);
+
+it('accepts a byte length at the maximum boundary', function (): void {
+    expect(strlen(Bytes::generate(Bytes::MAXIMUM_LENGTH)))->toBe(Bytes::MAXIMUM_LENGTH);
+});
+
 it('generates a url-safe token of the exact character length', function (): void {
     $token = Token::urlSafe(40);
 
@@ -29,6 +37,14 @@ it('generates a url-safe token of the exact character length', function (): void
 
 it('rejects a token below the minimum length', function (): void {
     Token::urlSafe(16);
+})->throws(InvalidLengthException::class);
+
+it('rejects a token above the maximum length', function (): void {
+    Token::urlSafe(Token::MAXIMUM_LENGTH + 1);
+})->throws(InvalidLengthException::class);
+
+it('rejects a custom-alphabet token above the maximum length', function (): void {
+    Token::fromAlphabet('AB', Token::MAXIMUM_LENGTH + 1);
 })->throws(InvalidLengthException::class);
 
 it('generates a token from a custom alphabet', function (): void {
@@ -72,12 +88,21 @@ it('generates a base32 secret of the exact character length', function (): void 
     Base32::decode($secret);
 });
 
-it('generates base32 secrets of varying length', function (int $chars): void {
-    expect(strlen(Secret::base32($chars)))->toBe($chars);
-})->with([16, 26, 52]);
+it('generates canonical base32 secrets of varying length', function (int $chars): void {
+    $secret = Secret::base32($chars);
+
+    // Every generated secret must be exactly $chars and decode cleanly under the
+    // strict (canonical) decoder — even at non-byte-aligned lengths.
+    expect(strlen($secret))->toBe($chars);
+    Base32::decode($secret);
+})->with([16, 26, 40, 52, 63]);
 
 it('rejects a non-positive secret length', function (): void {
     Secret::base32(0);
+})->throws(InvalidLengthException::class);
+
+it('rejects a secret length above the maximum', function (): void {
+    Secret::base32(Secret::MAXIMUM_CHARS + 1);
 })->throws(InvalidLengthException::class);
 
 it('exposes the minimum token length constant', function (): void {

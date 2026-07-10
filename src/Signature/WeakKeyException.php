@@ -33,6 +33,11 @@ final class WeakKeyException extends CryptoException
         return new self('The HMAC secret is a single repeated byte; use at least 32 random bytes.');
     }
 
+    public static function longSecret(): self
+    {
+        return new self('The HMAC secret must be at most 1024 bytes; a longer key adds no security.');
+    }
+
     public static function rsaTooSmall(int $bits): self
     {
         return new self("The RSA key must be at least 2048 bits; got [{$bits}].");

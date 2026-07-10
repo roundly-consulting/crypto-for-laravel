@@ -60,6 +60,12 @@ trait ReadsKeyMaterial
     /**
      * Persist private key material with restrictive visibility where the disk
      * supports it (0600-style perms on the local driver).
+     *
+     * NOTE: 'private' visibility is driver-dependent. On the local driver it maps
+     * to owner-only file permissions; on some adapters (e.g. certain object
+     * stores) it is a coarser ACL or a no-op. Only persist secret key material to
+     * a disk you control that is private and local-permission-capable — never a
+     * world-readable or publicly-served disk.
      */
     protected static function persistPrivate(string $disk, string $path, string $contents): void
     {

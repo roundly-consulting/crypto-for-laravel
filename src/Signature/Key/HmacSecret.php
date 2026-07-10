@@ -34,6 +34,13 @@ final class HmacSecret
 
     private const int MIN_BYTES = 32;
 
+    /**
+     * A sane ceiling on a generated secret. HMAC keys longer than the block size
+     * add no security, so this only stops a caller wiring the length to untrusted
+     * input from self-inflicting a DoS.
+     */
+    private const int MAX_BYTES = 1024;
+
     private function __construct(public string $value) {}
 
     /**
@@ -80,6 +87,10 @@ final class HmacSecret
     {
         if ($bytes < self::MIN_BYTES) {
             throw WeakKeyException::shortSecret();
+        }
+
+        if ($bytes > self::MAX_BYTES) {
+            throw WeakKeyException::longSecret();
         }
 
         // The bytes come straight from the CSPRNG, so the fromString entropy

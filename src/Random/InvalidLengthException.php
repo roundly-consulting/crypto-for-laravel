@@ -17,6 +17,11 @@ final class InvalidLengthException extends CryptoException
         return new self("A length of [{$length}] is below the minimum of [{$minimum}].");
     }
 
+    public static function tooLong(int $length, int $maximum): self
+    {
+        return new self("A length of [{$length}] is above the maximum of [{$maximum}].");
+    }
+
     public static function emptyAlphabet(): self
     {
         return new self('The alphabet must contain at least one character.');

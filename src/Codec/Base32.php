@@ -16,7 +16,7 @@ namespace RoundlyConsulting\Crypto\Codec;
  */
 final class Base32
 {
-    private const string ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    public const string ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
     /** Valid `=` padding lengths for a base32 group (2/4/5/7 data chars). */
     private const array VALID_PADDING = [1, 3, 4, 6];

@@ -115,6 +115,12 @@ final readonly class RsaKey implements PublicKey
             throw WeakKeyException::rsaTooSmall($bits);
         }
 
+        // Cap generation too: a caller wiring the bit size to untrusted input
+        // could otherwise burn unbounded CPU generating an absurdly large key.
+        if ($bits > self::MAX_BITS) {
+            throw WeakKeyException::rsaTooLarge($bits);
+        }
+
         $key = OpenSsl::generateKey([
             'private_key_type' => OPENSSL_KEYTYPE_RSA,
             'private_key_bits' => $bits,

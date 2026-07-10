@@ -18,15 +18,27 @@ final class Token
     public const int MINIMUM_LENGTH = 32;
 
     /**
+     * A sane ceiling on token length. Far above any real bearer/refresh token, it
+     * stops a caller wiring the length to untrusted input from self-inflicting a
+     * DoS.
+     */
+    public const int MAXIMUM_LENGTH = 4096;
+
+    /**
      * A URL-safe token of exactly $length base64url characters, backed by a
      * CSPRNG.
      *
-     * @throws InvalidLengthException when below {@see self::MINIMUM_LENGTH}
+     * @throws InvalidLengthException when below {@see self::MINIMUM_LENGTH} or
+     *                                above {@see self::MAXIMUM_LENGTH}
      */
     public static function urlSafe(int $length = 40): string
     {
         if ($length < self::MINIMUM_LENGTH) {
             throw InvalidLengthException::tooShort($length, self::MINIMUM_LENGTH);
+        }
+
+        if ($length > self::MAXIMUM_LENGTH) {
+            throw InvalidLengthException::tooLong($length, self::MAXIMUM_LENGTH);
         }
 
         // base64url yields ~4 chars per 3 bytes; over-generate then trim to the
@@ -81,6 +93,10 @@ final class Token
 
         if ($length < 1) {
             throw InvalidLengthException::tooShort($length, 1);
+        }
+
+        if ($length > self::MAXIMUM_LENGTH) {
+            throw InvalidLengthException::tooLong($length, self::MAXIMUM_LENGTH);
         }
 
         $max = strlen($alphabet) - 1;
