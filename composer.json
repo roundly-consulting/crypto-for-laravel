@@ -1,0 +1,83 @@
+{
+    "name": "roundly-consulting/crypto-for-laravel",
+    "description": "Native, audited cryptographic and encoding primitives for Laravel: JWS/JOSE, TOTP/HOTP, WebAuthn signature verification, HMAC, CSPRNG tokens, and codecs — zero-config, à la carte.",
+    "keywords": [
+        "roundly-consulting",
+        "laravel",
+        "crypto",
+        "jose",
+        "jws",
+        "totp",
+        "hotp",
+        "webauthn",
+        "cose",
+        "hmac",
+        "base64url"
+    ],
+    "homepage": "https://github.com/roundly-consulting/crypto-for-laravel",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Andrej Mihaliak",
+            "email": "andrej@mihaliak.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "ext-hash": "*",
+        "ext-mbstring": "*",
+        "ext-openssl": "*",
+        "illuminate/contracts": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.18",
+        "mockery/mockery": "^1.6",
+        "nunomaduro/collision": "^8.5",
+        "orchestra/testbench": "^10.0|^11.0",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-arch": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.0",
+        "phpstan/phpstan-deprecation-rules": "^2.0"
+    },
+    "suggest": {
+        "ext-sodium": "Required for Ed25519 (EdDSA) signature verification; ships enabled by default on modern PHP."
+    },
+    "autoload": {
+        "psr-4": {
+            "RoundlyConsulting\\Crypto\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "RoundlyConsulting\\Crypto\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "format": "vendor/bin/pint",
+        "analyse": "vendor/bin/phpstan analyse --no-progress",
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage --min=95"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "RoundlyConsulting\\Crypto\\CryptoServiceProvider"
+            ],
+            "aliases": {
+                "Crypto": "RoundlyConsulting\\Crypto\\Facades\\Crypto"
+            }
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
