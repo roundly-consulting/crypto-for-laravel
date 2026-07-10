@@ -17,6 +17,15 @@ use SensitiveParameter;
  */
 final readonly class Totp
 {
+    /**
+     * The largest drift window {@see verify()} accepts, in steps either side of
+     * the current one. A window of 10 covers ±5 minutes at the default 30-second
+     * period — already generous for clock skew — and bounds the verify loop to at
+     * most 21 HMAC evaluations so a hostile or mis-set window can never trigger an
+     * unbounded run.
+     */
+    public const int MAX_WINDOW = 10;
+
     private Hotp $hotp;
 
     public function __construct(
@@ -68,7 +77,7 @@ final readonly class Totp
         int $window = 1,
         ?int $timestamp = null,
     ): int|false {
-        if ($window < 0) {
+        if ($window < 0 || $window > self::MAX_WINDOW) {
             throw InvalidOtpParameterException::window($window);
         }
 

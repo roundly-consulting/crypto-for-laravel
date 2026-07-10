@@ -81,9 +81,34 @@ it('rejects a wrong or malformed code', function (): void {
         ->and($totp->verify('JBSWY3DPEHPK3PXP', '12345', 1, 1_000_000))->toBeFalse();
 });
 
+it('returns the integer 0 for a match at timestep zero', function (): void {
+    $totp = new Totp;
+    $secret = 'JBSWY3DPEHPK3PXP';
+    $code = $totp->codeAt($secret, 0);
+
+    // A match at timestep 0 must be the int 0, not false — the two are only
+    // distinguishable with a strict comparison, which callers must use.
+    expect($totp->verify($secret, $code, 0, 0))->toBe(0)
+        ->and($totp->verify($secret, $code, 0, 0))->not->toBeFalse();
+});
+
 it('rejects a negative verification window', function (): void {
     (new Totp)->verify('JBSWY3DPEHPK3PXP', '000000', -1, 1_000_000);
 })->throws(InvalidOtpParameterException::class);
+
+it('rejects a drift window beyond the documented maximum', function (): void {
+    (new Totp)->verify('JBSWY3DPEHPK3PXP', '000000', Totp::MAX_WINDOW + 1, 1_000_000);
+})->throws(InvalidOtpParameterException::class);
+
+it('accepts the maximum drift window', function (): void {
+    // The largest permitted window must be usable, not merely the boundary of a
+    // rejection; a match at that extreme still verifies.
+    $totp = new Totp;
+    $secret = 'JBSWY3DPEHPK3PXP';
+    $code = $totp->codeAt($secret, 1_000_000 + Totp::MAX_WINDOW * 30);
+
+    expect($totp->verify($secret, $code, Totp::MAX_WINDOW, 1_000_000))->toBe(33333 + Totp::MAX_WINDOW);
+});
 
 it('rejects a non-positive period', function (): void {
     new Totp(OtpAlgorithm::Sha1, 6, 0);

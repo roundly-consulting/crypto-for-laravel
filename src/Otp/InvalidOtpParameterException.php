@@ -24,6 +24,6 @@ final class InvalidOtpParameterException extends CryptoException
 
     public static function window(int $window): self
     {
-        return new self("OTP verification window must not be negative; got [{$window}].");
+        return new self("OTP verification window must be between 0 and 10 steps; got [{$window}].");
     }
 }
