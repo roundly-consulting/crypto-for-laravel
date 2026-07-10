@@ -36,12 +36,15 @@ final readonly class Digest
     /**
      * A hexadecimal digest, HMAC'd with the pepper when one is supplied.
      *
-     * A null, empty, or whitespace-only pepper means "no pepper" and falls back
-     * to a plain hash; a real pepper is used verbatim (never trimmed).
+     * The plain-vs-keyed choice is explicit, never inferred from the pepper's
+     * content: only `null` selects the plain digest. Any non-null pepper — even
+     * whitespace or an empty string — is used verbatim as the HMAC key (never
+     * trimmed), so a caller can never silently downgrade a keyed digest to an
+     * unkeyed one by passing a blank string.
      */
     public function withPepper(string $data, #[SensitiveParameter] ?string $pepper): string
     {
-        return $pepper === null || trim($pepper) === ''
+        return $pepper === null
             ? hash($this->algorithm->value, $data, false)
             : hash_hmac($this->algorithm->value, $data, $pepper, false);
     }
