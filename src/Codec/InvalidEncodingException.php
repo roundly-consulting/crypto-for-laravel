@@ -16,6 +16,11 @@ final class InvalidEncodingException extends CryptoException
         return new self('The value is not valid, unpadded base64url.');
     }
 
+    public static function base64(): self
+    {
+        return new self('The value is not valid, padded standard base64.');
+    }
+
     public static function base32(string $character): self
     {
         return new self("The value contains a character outside the base32 alphabet: [{$character}].");
