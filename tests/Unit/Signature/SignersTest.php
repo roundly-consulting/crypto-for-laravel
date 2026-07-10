@@ -180,6 +180,18 @@ describe('EdDSA', function (): void {
             ->and($eddsa->verify('tampered', $sig))->toBeFalse();
     });
 
+    it('reproduces the RFC 8032 section 7.1 Ed25519 known-answer vector', function (): void {
+        // RFC 8032 TEST 2: seed + public form the 64-byte libsodium secret key.
+        $seed = hex2bin('4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb');
+        $public = hex2bin('3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c');
+        $key = OkpKey::fromSecretKey($seed.$public);
+        $signature = (new EdDSA($key))->sign((string) hex2bin('72'));
+
+        expect(bin2hex($signature))
+            ->toBe('92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00')
+            ->and((new EdDSA(OkpKey::ed25519((string) $public)))->verify((string) hex2bin('72'), $signature))->toBeTrue();
+    });
+
     it('signs with a key restored from its secret key', function (): void {
         $generated = OkpKey::generate();
         $restored = OkpKey::fromSecretKey((string) $generated->secretKey);
