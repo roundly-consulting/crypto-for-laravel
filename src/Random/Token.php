@@ -37,6 +37,38 @@ final class Token
     }
 
     /**
+     * The digit alphabet for {@see self::numeric()}.
+     */
+    public const string DIGITS = '0123456789';
+
+    /**
+     * The case-sensitive alphanumeric alphabet for {@see self::alphanumeric()}.
+     */
+    public const string ALPHANUMERIC = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+
+    /**
+     * A digits-only token of exactly $length characters (recovery codes, numeric
+     * OTPs), drawn uniformly with a CSPRNG.
+     *
+     * @throws InvalidLengthException when $length < 1
+     */
+    public static function numeric(int $length): string
+    {
+        return self::fromAlphabet(self::DIGITS, $length);
+    }
+
+    /**
+     * An alphanumeric token of exactly $length characters, drawn uniformly with a
+     * CSPRNG.
+     *
+     * @throws InvalidLengthException when $length < 1
+     */
+    public static function alphanumeric(int $length): string
+    {
+        return self::fromAlphabet(self::ALPHANUMERIC, $length);
+    }
+
+    /**
      * A token of $length characters drawn uniformly from the given alphabet.
      *
      * @throws InvalidLengthException when the alphabet is empty or $length < 1

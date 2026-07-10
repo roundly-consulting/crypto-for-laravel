@@ -38,6 +38,24 @@ it('generates a token from a custom alphabet', function (): void {
         ->and($token)->toMatch('/^[AB]+$/');
 });
 
+it('generates a numeric token of the exact length', function (): void {
+    $token = Token::numeric(10);
+
+    expect(strlen($token))->toBe(10)
+        ->and($token)->toMatch('/^[0-9]+$/');
+});
+
+it('generates an alphanumeric token of the exact length', function (): void {
+    $token = Token::alphanumeric(24);
+
+    expect(strlen($token))->toBe(24)
+        ->and($token)->toMatch('/^[0-9A-Za-z]+$/');
+});
+
+it('rejects a non-positive numeric length', function (): void {
+    Token::numeric(0);
+})->throws(InvalidLengthException::class);
+
 it('rejects an empty alphabet', function (): void {
     Token::fromAlphabet('', 10);
 })->throws(InvalidLengthException::class);
