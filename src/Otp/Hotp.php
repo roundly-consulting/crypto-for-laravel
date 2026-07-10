@@ -39,7 +39,11 @@ final readonly class Hotp
             | ((ord($hash[$offset + 2]) & 0xFF) << 8)
             | (ord($hash[$offset + 3]) & 0xFF);
 
-        $otp = $binary % (10 ** $this->digits);
+        // The truncated value is 31 bits (max 2,147,483,647 — ten digits), so a
+        // modulus of 10^10 or more is a no-op. Skipping it keeps the arithmetic
+        // inside a 32-bit signed int, since 10^10 overflows one. This makes the
+        // full 6–10 digit range correct on 32-bit PHP as well as 64-bit.
+        $otp = $this->digits >= 10 ? $binary : $binary % (10 ** $this->digits);
 
         return str_pad((string) $otp, $this->digits, '0', STR_PAD_LEFT);
     }

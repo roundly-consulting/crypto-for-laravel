@@ -31,6 +31,16 @@ it('parses assertion authenticator data without attested data', function (): voi
         ->and($parsed->aaguid)->toBeNull();
 });
 
+it('reads a high sign counter as an unsigned 32-bit integer', function (): void {
+    // A counter with the top bit set (0xFFFFFFFF) must decode to 4_294_967_295,
+    // never a negative value — the counter is unsigned. Requires 64-bit PHP.
+    $bytes = str_repeat("\x00", 32).chr(0x05)."\xFF\xFF\xFF\xFF";
+    $parsed = AuthenticatorData::parse($bytes);
+
+    expect($parsed->signCount)->toBe(4_294_967_295)
+        ->and($parsed->signCount)->toBeGreaterThan(0);
+});
+
 it('rejects authenticator data that is too short', function (): void {
     AuthenticatorData::parse(str_repeat("\x00", 10));
 })->throws(MalformedCborException::class);

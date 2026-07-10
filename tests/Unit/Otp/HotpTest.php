@@ -27,6 +27,20 @@ it('matches every RFC 4226 Appendix D HOTP vector', function (int $counter, stri
     expect($hotp->at($secret, $counter))->toBe($expected);
 })->with('rfc4226');
 
+it('produces the full digit range without 32-bit overflow', function (int $digits, string $expected): void {
+    $hotp = new Hotp(OtpAlgorithm::Sha1, $digits);
+    $secret = Base32::encode('12345678901234567890');
+
+    // The truncated value for counter 0 is 1_284_755_224; every digit width is a
+    // suffix of it, and 10 digits must not overflow a 32-bit int (10^10 does).
+    expect($hotp->at($secret, 0))->toBe($expected)
+        ->and(strlen($hotp->at($secret, 0)))->toBe($digits);
+})->with([
+    [6, '755224'],
+    [9, '284755224'],
+    [10, '1284755224'],
+]);
+
 it('exposes its configured digits and algorithm', function (): void {
     $hotp = new Hotp(OtpAlgorithm::Sha256, 8);
 
