@@ -152,10 +152,23 @@ final class Der
             return null;
         }
 
+        // DER requires the minimal length encoding: no leading zero octet in the
+        // long form. Rejecting it closes the BER length-malleability Wycheproof
+        // flags (a leading-0x00 length is non-canonical).
+        if ($der[$offset] === "\x00") {
+            return null;
+        }
+
         $value = 0;
 
         for ($i = 0; $i < $count; $i++) {
             $value = ($value << 8) | ord($der[$offset++]);
+        }
+
+        // A value that fits in short form must use it; the long form here is
+        // non-minimal (again BER, not DER) and is rejected.
+        if ($value < 0x80) {
+            return null;
         }
 
         return $value;

@@ -121,4 +121,6 @@ it('reports malformed DER as invalid', function (string $der): void {
     'zero-length integer' => ["\x30\x06\x02\x00\x02\x02\x01\x01"],
     'oversized long-form length' => ["\x30\x85\x01\x01\x01\x01\x01\x01"],
     'indefinite long-form length' => ["\x30\x80\x02\x01\x01\x02\x01\x01"],
+    'non-minimal long-form length' => ["\x30\x81\x06\x02\x01\x01\x02\x01\x01"],
+    'leading-zero length octet' => ["\x30\x82\x00\x06\x02\x01\x01\x02\x01\x01"],
 ]);
