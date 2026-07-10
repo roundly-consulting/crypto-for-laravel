@@ -111,6 +111,19 @@ describe('Es', function (): void {
             ->and($verifier->verify('tampered', hex2bin($vector['sig_raw'])))->toBeFalse();
     })->with(['es256', 'es384', 'es512']);
 
+    it('accepts both a signature and its malleable r||(n-s) twin (raw ECDSA is malleable)', function (): void {
+        // Property: raw ECDSA is malleable — s and n−s are both valid. The two
+        // are DISTINCT byte strings, so a caller must never treat a signature as a
+        // unique idempotency/dedup key. This pins the behaviour, it does not fix
+        // it (JOSE/WebAuthn do not require low-S).
+        $vector = cryptoVectors()['es256'];
+        $verifier = new Es(EcKey::public($vector['public_pem']));
+
+        expect($vector['sig_raw'])->not->toBe($vector['sig_raw_high_s'])
+            ->and($verifier->verify(hex2bin($vector['message']), hex2bin($vector['sig_raw'])))->toBeTrue()
+            ->and($verifier->verify(hex2bin($vector['message']), hex2bin($vector['sig_raw_high_s'])))->toBeTrue();
+    });
+
     it('refuses to sign with a public-only key', function (): void {
         (new Es(EcKey::public(keyPem('ec-public'))))->sign('message');
     })->throws(KeyLoadException::class);
@@ -137,6 +150,16 @@ describe('EdDSA', function (): void {
 
         expect($verifier->verify(hex2bin($eddsa['message']), $sig))->toBeFalse()
             ->and($verifier->verify('different data', hex2bin($eddsa['sig'])))->toBeFalse();
+    });
+
+    it('rejects a small-order (all-zero) Ed25519 public key at verify', function (): void {
+        // Property: libsodium rejects small-order points, so an all-zero public
+        // key can never make a signature verify. verify() returns false rather
+        // than throwing or accepting.
+        $verifier = new EdDSA(OkpKey::ed25519(str_repeat("\x00", 32)));
+
+        expect($verifier->verify('message', str_repeat("\x00", 64)))->toBeFalse()
+            ->and($verifier->verify(hex2bin(cryptoVectors()['eddsa']['message']), hex2bin(cryptoVectors()['eddsa']['sig'])))->toBeFalse();
     });
 
     it('rejects a wrong-length Ed25519 signature', function (): void {

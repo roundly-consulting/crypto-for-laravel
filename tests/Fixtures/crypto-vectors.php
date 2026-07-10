@@ -18,6 +18,10 @@ return [
         'message' => '63727970746f2d666f722d6c61726176656c20776562617574686e207369676e65642064617461',
         'sig_der' => '3045022100946354c1393589ad6897f68b981399070ea28f47748ceeeedf584cc6a02f6f0d022054dc30801a1cfac4be0d1ee8cf7a2e0446ae1622567705ce4f4fc0c04243d7e4',
         'sig_raw' => '946354c1393589ad6897f68b981399070ea28f47748ceeeedf584cc6a02f6f0d54dc30801a1cfac4be0d1ee8cf7a2e0446ae1622567705ce4f4fc0c04243d7e4',
+        // The malleable twin r‖(n−s): a distinct byte string that OpenSSL still
+        // accepts as valid for the same message and key (raw ECDSA is malleable),
+        // proving a signature must never be used as an idempotency/dedup key.
+        'sig_raw_high_s' => '946354c1393589ad6897f68b981399070ea28f47748ceeeedf584cc6a02f6f0dab23cf7ee5e3053c41f2e1173085d1fb7638e48b50a098b6a46a0a02ba1f4d6d',
         'public_pem' => '-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEjKD2ZK62BeUIR28KrzxGlSQgZvh6
 kcS1ZiUkdeqDVxDjip77bXcIs7SWoqhsrPEYWxcn8TPBu5q/6OvbjA/dCA==
