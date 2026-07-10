@@ -47,7 +47,19 @@ it('rejects malformed CBOR', function (string $hex): void {
     'array length exceeds input' => ['98ff'],
     'map length exceeds input' => ['b8ff'],
     'non int or string map key' => ['a1800100'],
+    'duplicate map key' => ['a2010101'.'02'],
+    'non-minimal uint8' => ['1817'],
+    'non-minimal uint16' => ['190018'],
+    'non-minimal uint32' => ['1a00000100'],
+    'non-minimal uint64' => ['1b0000000000010000'],
+    'non-minimal negative int' => ['3817'],
 ]);
+
+it('accepts a distinct-key map but rejects a repeated one', function (): void {
+    expect((new CborDecoder)->decode(hex2bin('a201010202')))->toBe([1 => 1, 2 => 2]);
+
+    (new CborDecoder)->decode(hex2bin('a2010101'.'02'));
+})->throws(MalformedCborException::class, 'duplicate map key');
 
 it('rejects nesting deeper than the depth cap', function (): void {
     // 17 levels of single-element arrays (0x81) exceeds MAX_DEPTH (16).

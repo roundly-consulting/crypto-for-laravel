@@ -109,6 +109,20 @@ final class CborDecoder
             throw MalformedCborException::make('length exceeds supported range');
         }
 
+        // CTAP2 canonical CBOR requires the shortest encoding: a value that fits
+        // in fewer bytes must use them. Rejecting the long form removes the
+        // encoding malleability WebAuthn forbids.
+        $minimum = match ($count) {
+            1 => 24,
+            2 => 0x100,
+            4 => 0x10000,
+            default => 0x100000000,
+        };
+
+        if ($value < $minimum) {
+            throw MalformedCborException::make('non-canonical (non-shortest) integer encoding');
+        }
+
         return $value;
     }
 
@@ -158,6 +172,13 @@ final class CborDecoder
 
             if (! is_int($key) && ! is_string($key)) {
                 throw MalformedCborException::make('map keys must be integers or strings');
+            }
+
+            // Canonical CBOR forbids duplicate keys; without this a later value
+            // would silently overwrite an earlier one, so one logical map could
+            // have several byte encodings.
+            if (array_key_exists($key, $map)) {
+                throw MalformedCborException::make('duplicate map key');
             }
 
             $map[$key] = $this->readItem($bytes, $offset, $depth + 1);
