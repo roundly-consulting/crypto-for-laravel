@@ -48,6 +48,21 @@ it('rejects attested data that is truncated', function (): void {
     AuthenticatorData::parse($bytes);
 })->throws(MalformedCborException::class);
 
+it('rejects a zero-length credential id', function (): void {
+    // AT set, 16-byte AAGUID present, but the credential-id length is zero.
+    $bytes = str_repeat("\x00", 32).chr(0x41).pack('N', 1).str_repeat("\x00", 16)."\x00\x00";
+
+    AuthenticatorData::parse($bytes);
+})->throws(MalformedCborException::class);
+
+it('rejects a COSE key region that is not a map', function (): void {
+    // AT set, a 1-byte credential id, then a CBOR integer where the COSE map
+    // should be.
+    $bytes = str_repeat("\x00", 32).chr(0x41).pack('N', 1).str_repeat("\x00", 16)."\x00\x01"."\xaa"."\x00";
+
+    AuthenticatorData::parse($bytes);
+})->throws(MalformedCborException::class);
+
 it('parses authenticator data with a trailing extension map', function (): void {
     // rpIdHash + flags(UP|ED) + signCount + one CBOR extension map (empty).
     $bytes = str_repeat("\x00", 32).chr(0x81).pack('N', 5)."\xa0";
