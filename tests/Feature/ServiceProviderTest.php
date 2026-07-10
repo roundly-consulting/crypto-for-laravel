@@ -84,5 +84,7 @@ it('surfaces COSE and OTP discovery helpers through the facade', function (): vo
 });
 
 it('reports its status through the about command', function (): void {
-    $this->artisan('about')->assertOk();
+    $this->artisan('about --only=crypto')
+        ->assertOk()
+        ->expectsOutputToContain('JOSE / JWS');
 });

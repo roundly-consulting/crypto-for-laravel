@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Crypto;
 
-use Illuminate\Console\AboutCommand;
+use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\Crypto\Cose\CborDecoder;
 use RoundlyConsulting\Crypto\Jose\Jws;
