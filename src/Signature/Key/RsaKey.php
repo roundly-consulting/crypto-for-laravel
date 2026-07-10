@@ -26,6 +26,17 @@ final readonly class RsaKey implements PublicKey
 
     private const int MIN_BITS = 2048;
 
+    /**
+     * A sane ceiling on the modulus size. Beyond this, verification cost (a
+     * modular exponentiation over the modulus) grows without buying any security,
+     * so an attacker-supplied oversized key is a denial-of-service vector rather
+     * than a stronger key. 8192 bits is far above any real deployment.
+     */
+    private const int MAX_BITS = 8192;
+
+    /** 8192 bits as bytes — the ceiling used to reject a raw modulus before it is even parsed. */
+    private const int MAX_MODULUS_BYTES = self::MAX_BITS / 8;
+
     private function __construct(
         public OpenSSLAsymmetricKey $key,
         public bool $isPrivate,
@@ -81,6 +92,13 @@ final readonly class RsaKey implements PublicKey
     {
         if ($modulus === '' || $exponent === '') {
             throw KeyLoadException::unreadable('public');
+        }
+
+        // Reject an oversized modulus before building or parsing a PEM, so a
+        // pathologically large key can never reach the (expensive) parse/verify
+        // path at all.
+        if (strlen(ltrim($modulus, "\x00")) > self::MAX_MODULUS_BYTES) {
+            throw WeakKeyException::rsaTooLarge(strlen(ltrim($modulus, "\x00")) * 8);
         }
 
         return self::public(Asn1::rsaPublicKeyPem($modulus, $exponent));
@@ -214,6 +232,34 @@ final readonly class RsaKey implements PublicKey
 
         if ($bits < self::MIN_BITS) {
             throw WeakKeyException::rsaTooSmall($bits);
+        }
+
+        if ($bits > self::MAX_BITS) {
+            throw WeakKeyException::rsaTooLarge($bits);
+        }
+
+        self::assertSaneExponent($details['rsa']['e'] ?? '');
+    }
+
+    /**
+     * The public exponent must be an odd integer of at least 3. Zero, one, and
+     * any even value (which cannot be a valid RSA exponent) are rejected; 65537
+     * is the norm and 3 is the smallest safe value.
+     *
+     * @param  mixed  $exponent  the raw big-endian exponent bytes from openssl_pkey_get_details
+     *
+     * @throws WeakKeyException
+     */
+    private static function assertSaneExponent(mixed $exponent): void
+    {
+        $bytes = is_string($exponent) ? ltrim($exponent, "\x00") : '';
+
+        // Empty (zero) or a single 0x01 byte (one) are both too small; an even
+        // low byte means an even exponent. Everything else is odd and ≥ 3.
+        $isEven = $bytes === '' || (ord($bytes[strlen($bytes) - 1]) & 1) === 0;
+
+        if ($bytes === '' || $bytes === "\x01" || $isEven) {
+            throw WeakKeyException::rsaBadExponent();
         }
     }
 }

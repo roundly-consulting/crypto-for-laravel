@@ -54,6 +54,37 @@ describe('RsaKey', function (): void {
         RsaKey::public(keyPem('weak-1024-public'));
     })->throws(WeakKeyException::class);
 
+    it('rejects a modulus above the 8192-bit ceiling', function (): void {
+        RsaKey::public(keyPem('rsa-9216-public'));
+    })->throws(WeakKeyException::class);
+
+    it('rejects an oversized raw modulus before it is parsed', function (): void {
+        // 1025 bytes = 8200 bits, one byte past the ceiling; rejected without
+        // ever building or parsing a PEM.
+        RsaKey::fromModulusExponent(str_repeat("\x01", 1025), "\x01\x00\x01");
+    })->throws(WeakKeyException::class);
+
+    it('accepts sane public exponents', function (string $exponent): void {
+        $n = (new RoundlyConsulting\Crypto\Cose\CborDecoder)->decode(hex2bin(cryptoVectors()['rs256']['cose']))[-1];
+
+        expect(RsaKey::fromModulusExponent($n, $exponent)->algorithm())->toBe(Algorithm::RS256);
+    })->with([
+        '3' => ["\x03"],
+        '65537' => ["\x01\x00\x01"],
+    ]);
+
+    it('rejects a zero, one, or even public exponent', function (string $exponent): void {
+        $n = (new RoundlyConsulting\Crypto\Cose\CborDecoder)->decode(hex2bin(cryptoVectors()['rs256']['cose']))[-1];
+
+        RsaKey::fromModulusExponent($n, $exponent);
+    })->throws(WeakKeyException::class)->with([
+        'zero' => ["\x00"],
+        'one' => ["\x01"],
+        'two' => ["\x02"],
+        'even' => ["\x04"],
+        'large-even' => ["\x01\x00\x02"],
+    ]);
+
     it('rejects an unreadable PEM', function (): void {
         RsaKey::public('not a pem');
     })->throws(KeyLoadException::class);

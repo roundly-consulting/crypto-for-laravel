@@ -38,6 +38,16 @@ final class WeakKeyException extends CryptoException
         return new self("The RSA key must be at least 2048 bits; got [{$bits}].");
     }
 
+    public static function rsaTooLarge(int $bits): self
+    {
+        return new self("The RSA key must be at most 8192 bits; got [{$bits}].");
+    }
+
+    public static function rsaBadExponent(): self
+    {
+        return new self('The RSA public exponent must be an odd integer of at least 3 (65537 is the norm).');
+    }
+
     public static function unsupportedCurve(string $curve): self
     {
         return new self("The curve [{$curve}] is not supported.");
