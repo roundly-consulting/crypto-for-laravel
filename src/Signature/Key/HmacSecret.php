@@ -6,19 +6,22 @@ namespace RoundlyConsulting\Crypto\Signature\Key;
 
 use RoundlyConsulting\Crypto\Random\Bytes;
 use RoundlyConsulting\Crypto\Signature\KeyLoadException;
+use RoundlyConsulting\Crypto\Signature\OpenSsl;
 use RoundlyConsulting\Crypto\Signature\WeakKeyException;
 use SensitiveParameter;
 
 /**
  * A validated shared secret for HS-family (HMAC) signatures.
  *
- * Four defences live in the factory: an empty secret is rejected; a value that
- * looks like a PEM is rejected so an RSA public key can never be smuggled in as
- * an HMAC key (the classic RS256→HS256 confusion attack); a secret under 256
- * bits is rejected as brute-forceable (RFC 7518 §3.2 requires HS256 keys of at
- * least the hash size); and a single-repeated-byte secret is rejected as
- * obviously low-entropy. The length guard measures bytes, not entropy, so the
- * value MUST be at least 32 *random* bytes.
+ * Four defences live in the factory: an empty secret is rejected; any value that
+ * carries public-key material is rejected so an RSA/EC public key can never be
+ * smuggled in as an HMAC key (the classic RS256→HS256 confusion attack) — this
+ * covers a PEM even behind leading whitespace or a UTF-8 BOM, and raw DER key
+ * bytes; a secret under 256 bits is rejected as brute-forceable (RFC 7518 §3.2
+ * requires HS256 keys of at least the hash size); and a single-repeated-byte
+ * secret is rejected as obviously low-entropy. The length guard measures bytes,
+ * not entropy — it is not a proof of randomness — so the value MUST be at least
+ * 32 *random* bytes (generate one with the CSPRNG factory below).
  */
 final readonly class HmacSecret
 {
@@ -37,7 +40,7 @@ final readonly class HmacSecret
             throw WeakKeyException::emptySecret();
         }
 
-        if (str_starts_with($secret, '-----BEGIN')) {
+        if (self::carriesKeyMaterial($secret)) {
             throw WeakKeyException::pemAsSecret();
         }
 
@@ -111,5 +114,38 @@ final readonly class HmacSecret
         self::persistPrivate($disk, $path, $secret->value);
 
         return $secret;
+    }
+
+    /**
+     * Whether the value carries public-key material and so must never be accepted
+     * as an HMAC secret. Catches a PEM even behind leading whitespace or a UTF-8
+     * BOM, and raw DER key bytes (by wrapping them and re-parsing). A CSPRNG
+     * secret never parses as a key, so this cannot reject legitimate material.
+     */
+    private static function carriesKeyMaterial(#[SensitiveParameter] string $secret): bool
+    {
+        // A textual PEM smuggle, robust to a leading BOM and/or whitespace.
+        $text = str_starts_with($secret, "\xEF\xBB\xBF") ? substr($secret, 3) : $secret;
+
+        if (str_starts_with(ltrim($text), '-----BEGIN')) {
+            return true;
+        }
+
+        // A parseable public key in PEM form.
+        if (@openssl_pkey_get_public($secret) !== false) {
+            OpenSsl::drainErrors();
+
+            return true;
+        }
+
+        OpenSsl::drainErrors();
+
+        // Raw DER key bytes: wrap as SPKI PEM and see if OpenSSL accepts them.
+        $pem = "-----BEGIN PUBLIC KEY-----\n".chunk_split(base64_encode($secret), 64, "\n").'-----END PUBLIC KEY-----';
+        $isDer = @openssl_pkey_get_public($pem) !== false;
+
+        OpenSsl::drainErrors();
+
+        return $isDer;
     }
 }

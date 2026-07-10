@@ -25,6 +25,33 @@ describe('HmacSecret', function (): void {
         HmacSecret::fromString("-----BEGIN PUBLIC KEY-----\nMFkw...\n-----END PUBLIC KEY-----");
     })->throws(WeakKeyException::class);
 
+    it('rejects a PEM hidden behind leading whitespace or a BOM', function (string $prefix): void {
+        HmacSecret::fromString($prefix.keyPem('rsa-public'));
+    })->throws(WeakKeyException::class)->with([
+        'leading-newlines' => ["\n\n  "],
+        'leading-spaces' => ['   '],
+        'utf8-bom' => ["\xEF\xBB\xBF"],
+    ]);
+
+    it('rejects a real public key PEM smuggled as a secret', function (): void {
+        HmacSecret::fromString(keyPem('rsa-public'));
+    })->throws(WeakKeyException::class);
+
+    it('rejects raw DER public-key bytes as a secret', function (): void {
+        // Strip the PEM armour to the underlying DER SubjectPublicKeyInfo; the
+        // raw bytes must still be recognised as key material, not a secret.
+        $pem = keyPem('ec-public');
+        $der = (string) base64_decode((string) preg_replace('/-----[^-]+-----|\s+/', '', $pem), true);
+
+        HmacSecret::fromString($der);
+    })->throws(WeakKeyException::class);
+
+    it('accepts a CSPRNG secret that is unaffected by the key-material guard', function (): void {
+        // Generated secrets never parse as keys; a fresh 32-byte value is fine.
+        // strlen (not toHaveLength) so raw binary bytes are counted, not glyphs.
+        expect(strlen(HmacSecret::fromString(HmacSecret::generate()->value)->value))->toBe(32);
+    });
+
     it('rejects a secret under 32 bytes', function (): void {
         HmacSecret::fromString('too-short');
     })->throws(WeakKeyException::class);
