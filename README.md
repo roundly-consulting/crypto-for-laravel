@@ -71,11 +71,18 @@ explicitly at the call site.
 
 ## Design: zero-config, keys are arguments
 
-This package never reads `config()` or `env()`, and never resolves a key from a file or the
-container. Every secret, PEM, and OTP secret is a `#[\SensitiveParameter]` argument, and every
-behavioural knob (hash algorithm, RSA bits, OTP digits/period) is a constructor default or
-named argument. Your application (or another package) owns configuration and wiring; this
-package owns the math and encoding.
+This package ships **no config file**, never reads `env()`, and never resolves a key
+implicitly for its own behaviour. Every secret, PEM, and OTP secret is a
+`#[\SensitiveParameter]` argument, and every behavioural knob (hash algorithm, RSA bits, OTP
+digits/period) is a constructor default or named argument. Your application (or another
+package) owns configuration and wiring; this package owns the math and encoding.
+
+The one deliberate exception is the opt-in `fromConfig()` key factories (see [Loading and
+generating keys](#loading-and-generating-keys)). `HmacSecret::fromConfig('jwt.secret')` reads
+**your** config key explicitly, at your call site — it is an accessor of the consumer's own
+config, not the package configuring itself. An arch test enforces this precisely: `env()` is
+banned everywhere, and `config()` is called **only** inside those `*FromConfig` factory
+methods.
 
 ## Usage
 
@@ -259,6 +266,70 @@ expect($token)->toBeValidJws($verifier, Algorithm::RS256);
 expect($code)->toBeValidTotp($secret);
 ```
 
+## Loading and generating keys
+
+Every key/secret class has a core zero-config factory — `HmacSecret::fromString()`,
+`RsaKey::public()`/`private()`, `EcKey::public()`/`private()`, `OkpKey::ed25519()`/
+`fromSecretKey()` — that needs no container, no config, and no disk. On top of those, each
+class adds opt-in **Laravel-native loaders** that read the material from a filesystem disk or
+from your own config key, plus **generators** so you never have to hand-roll a CSPRNG.
+
+Every loader validates with the exact same guards as the core factory (HMAC ≥ 32 random
+bytes and PEM-reject, RSA ≥ 2048, EC curve checks, Ed25519 length), and a missing file or
+missing/empty/non-string config value throws a typed `Signature\KeyLoadException` — never a
+PHP warning.
+
+```php
+use RoundlyConsulting\Crypto\Signature\Key\HmacSecret;
+use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
+use RoundlyConsulting\Crypto\Signature\Key\EcKey;
+use RoundlyConsulting\Crypto\Signature\Key\OkpKey;
+
+// From a filesystem disk (any configured disk name):
+$secret = HmacSecret::fromStorage('local', 'keys/hmac.key');
+$rsa    = RsaKey::privateFromStorage('local', 'keys/rsa.pem');
+$rsaPub = RsaKey::publicFromStorage('local', 'keys/rsa.pub');
+$ec     = EcKey::privateFromStorage('local', 'keys/ec.pem');
+$okp    = OkpKey::ed25519FromStorage('local', 'keys/ed25519.pub'); // 32 raw bytes
+
+// From YOUR config key (explicit — the package reads no config on its own):
+$secret = HmacSecret::fromConfig('services.webhook.secret');
+$rsa    = RsaKey::privateFromConfig('jwt.private_key');
+$ecPub  = EcKey::publicFromConfig('tokens.public_key');
+```
+
+Generate fresh material:
+
+```php
+$secret = HmacSecret::generate();      // 32 random bytes (≥256 bits); pass a larger byte count if you like
+$rsa    = RsaKey::generate(2048);      // or 3072 / 4096
+$ec     = EcKey::generate('P-256');    // or P-384 / P-521
+$okp    = OkpKey::generate();          // Ed25519, needs ext-sodium
+```
+
+### Load, or generate-and-persist on first boot
+
+`fromStorageOrGenerate()` loads the key from a disk path, or — when the file is **missing** —
+generates a fresh one, writes it to that path with private visibility, and returns it. An
+existing-but-invalid file is **never** overwritten; it still throws. For the asymmetric keys
+the persisted artifact is the **private** PEM (Ed25519 persists the 64-byte secret); derive
+and persist the public side yourself with `publicPem()`.
+
+```php
+// Bootstraps a secret on first run, reuses it forever after:
+$secret = HmacSecret::fromStorageOrGenerate('local', 'keys/hmac.key');
+
+// Asymmetric: private PEM is written; persist the public half alongside it:
+$key = RsaKey::fromStorageOrGenerate('local', 'keys/rsa.pem', bits: 3072);
+Storage::disk('local')->put('keys/rsa.pub', $key->publicPem(), 'private');
+
+$ec  = EcKey::fromStorageOrGenerate('local', 'keys/ec.pem', curve: 'P-384');
+$okp = OkpKey::fromStorageOrGenerate('local', 'keys/ed25519.key'); // 64-byte secret, ext-sodium
+```
+
+For discoverability the `Crypto` facade surfaces the new HMAC generator too —
+`Crypto::generateHmacSecret(48)` — returning the secret without ever caching it.
+
 ## Wiring your own keyed provider
 
 Because this package is zero-config, a keyed signer lives in **your** service provider, built
@@ -278,6 +349,20 @@ final class TokensServiceProvider extends ServiceProvider
         ));
     }
 }
+```
+
+Or lean on the opt-in loaders so the wiring reads straight from your config or disk — and, if
+you want zero setup, bootstraps a secret on first boot:
+
+```php
+$this->app->singleton(Hs::class, fn () => new Hs(
+    HmacSecret::fromConfig('tokens.secret'),
+));
+
+// self-bootstrapping variant — generates + persists the secret on first run:
+$this->app->singleton(Hs::class, fn () => new Hs(
+    HmacSecret::fromStorageOrGenerate('local', 'keys/tokens.key'),
+));
 ```
 
 ## Exceptions
