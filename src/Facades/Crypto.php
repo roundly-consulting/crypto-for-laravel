@@ -17,6 +17,7 @@ use RoundlyConsulting\Crypto\CryptoManager;
  * @method static \RoundlyConsulting\Crypto\Signature\Es es(\RoundlyConsulting\Crypto\Signature\Key\EcKey $key)
  * @method static \RoundlyConsulting\Crypto\Signature\EdDSA eddsa(\RoundlyConsulting\Crypto\Signature\Key\OkpKey $key)
  * @method static \RoundlyConsulting\Crypto\Signature\KeyVerifier verifier()
+ * @method static \RoundlyConsulting\Crypto\Signature\Key\HmacSecret generateHmacSecret(int $bytes = 32)
  * @method static \RoundlyConsulting\Crypto\Cose\CborDecoder cbor()
  * @method static \RoundlyConsulting\Crypto\Signature\Key\PublicKey coseKey(array<int|string, mixed> $cose)
  * @method static \RoundlyConsulting\Crypto\Cose\AuthenticatorData authenticatorData(string $bytes)

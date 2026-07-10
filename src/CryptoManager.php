@@ -99,6 +99,15 @@ final class CryptoManager
         return new KeyVerifier;
     }
 
+    /**
+     * Generate a fresh HMAC secret (≥256 bits of CSPRNG). Returned, never held —
+     * the manager caches no key material.
+     */
+    public function generateHmacSecret(int $bytes = 32): HmacSecret
+    {
+        return HmacSecret::generate($bytes);
+    }
+
     // ── COSE / WebAuthn ─────────────────────────────────────────────────────
 
     public function cbor(): CborDecoder

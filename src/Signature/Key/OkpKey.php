@@ -20,6 +20,8 @@ use SensitiveParameter;
  */
 final readonly class OkpKey implements PublicKey
 {
+    use ReadsKeyMaterial;
+
     private const int ED25519_PUBLIC_BYTES = 32;
 
     private const int ED25519_SECRET_BYTES = 64;
@@ -87,6 +89,69 @@ final readonly class OkpKey implements PublicKey
             sodium_crypto_sign_publickey($keypair),
             sodium_crypto_sign_secretkey($keypair),
         );
+    }
+
+    /**
+     * Load a raw 32-byte Ed25519 public key from a Laravel filesystem disk.
+     *
+     * @throws KeyLoadException when the file is missing or not 32 bytes
+     */
+    public static function ed25519FromStorage(string $disk, string $path): self
+    {
+        return self::ed25519(self::readFromStorage($disk, $path));
+    }
+
+    /**
+     * Load a raw 32-byte Ed25519 public key from the consumer's own config key.
+     *
+     * @throws KeyLoadException when the config value is missing or not 32 bytes
+     */
+    public static function ed25519FromConfig(string $key): self
+    {
+        return self::ed25519(self::requireConfigString($key, config($key)));
+    }
+
+    /**
+     * Load a 64-byte Ed25519 secret (signing) key from a Laravel filesystem disk.
+     *
+     * @throws KeyLoadException when the file is missing or not 64 bytes
+     * @throws UnsupportedAlgorithmException when ext-sodium is not loaded
+     */
+    public static function secretKeyFromStorage(string $disk, string $path): self
+    {
+        return self::fromSecretKey(self::readFromStorage($disk, $path));
+    }
+
+    /**
+     * Load a 64-byte Ed25519 secret (signing) key from the consumer's config key.
+     *
+     * @throws KeyLoadException when the config value is missing or not 64 bytes
+     * @throws UnsupportedAlgorithmException when ext-sodium is not loaded
+     */
+    public static function secretKeyFromConfig(string $key): self
+    {
+        return self::fromSecretKey(self::requireConfigString($key, config($key)));
+    }
+
+    /**
+     * Load a signing key from a disk path, generating and persisting a fresh one
+     * (the raw 64-byte secret key) when the file is missing. An existing-but-
+     * invalid key is never overwritten — it still throws.
+     *
+     * @throws KeyLoadException when the disk is unreadable or an existing secret is malformed
+     * @throws UnsupportedAlgorithmException when ext-sodium is not loaded
+     */
+    public static function fromStorageOrGenerate(string $disk, string $path): self
+    {
+        if (self::storageHas($disk, $path)) {
+            return self::secretKeyFromStorage($disk, $path);
+        }
+
+        $key = self::generate();
+
+        self::persistPrivate($disk, $path, (string) $key->secretKey);
+
+        return $key;
     }
 
     public function algorithm(): Algorithm

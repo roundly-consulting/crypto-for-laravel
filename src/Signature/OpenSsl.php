@@ -41,6 +41,25 @@ final class OpenSsl
     }
 
     /**
+     * Export a private key to PEM for persistence, turning any OpenSSL failure
+     * (e.g. an unusable `openssl.cnf`) into a typed exception.
+     *
+     * @throws KeyLoadException
+     */
+    public static function exportPrivatePem(OpenSSLAsymmetricKey $key): string
+    {
+        $pem = '';
+
+        if (@openssl_pkey_export($key, $pem) === false) {
+            self::drainErrors();
+
+            throw KeyLoadException::exportFailed();
+        }
+
+        return $pem;
+    }
+
+    /**
      * Produce a signature, throwing on any OpenSSL failure.
      *
      * @throws KeyLoadException

@@ -27,9 +27,24 @@ final class KeyLoadException extends CryptoException
         return new self("The EC curve [{$curve}] is not supported.");
     }
 
+    public static function missingFile(string $disk, string $path): self
+    {
+        return new self("No key material was found on disk [{$disk}] at [{$path}].");
+    }
+
+    public static function missingConfig(string $key): self
+    {
+        return new self("Config key [{$key}] holds no key material (missing, empty, or not a string).");
+    }
+
     public static function generationFailed(): self
     {
         return new self('Key generation failed.');
+    }
+
+    public static function exportFailed(): self
+    {
+        return new self('The private key could not be exported to PEM.');
     }
 
     public static function signingFailed(): self

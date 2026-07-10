@@ -23,6 +23,8 @@ use SensitiveParameter;
  */
 final readonly class EcKey implements PublicKey
 {
+    use ReadsKeyMaterial;
+
     private const string DEFAULT_CURVE = 'P-256';
 
     /**
@@ -124,9 +126,89 @@ final readonly class EcKey implements PublicKey
         return new self($key, true, $curve);
     }
 
+    /**
+     * Load an EC public key from a Laravel filesystem disk.
+     *
+     * @throws KeyLoadException
+     */
+    public static function publicFromStorage(string $disk, string $path): self
+    {
+        return self::public(self::readFromStorage($disk, $path));
+    }
+
+    /**
+     * Load an EC private key from a Laravel filesystem disk.
+     *
+     * @throws KeyLoadException
+     */
+    public static function privateFromStorage(string $disk, string $path): self
+    {
+        return self::private(self::readFromStorage($disk, $path));
+    }
+
+    /**
+     * Load an EC public key PEM from the consumer's own config key.
+     *
+     * @throws KeyLoadException
+     */
+    public static function publicFromConfig(string $key): self
+    {
+        return self::public(self::requireConfigString($key, config($key)));
+    }
+
+    /**
+     * Load an EC private key PEM from the consumer's own config key.
+     *
+     * @throws KeyLoadException
+     */
+    public static function privateFromConfig(string $key): self
+    {
+        return self::private(self::requireConfigString($key, config($key)));
+    }
+
+    /**
+     * Load a private key from a disk path, generating and persisting a fresh one
+     * (the private PEM) when the file is missing. Derive and persist the public
+     * side separately with {@see publicPem()}. An existing-but-invalid key is
+     * never overwritten — it still throws.
+     *
+     * @throws KeyLoadException|WeakKeyException
+     */
+    public static function fromStorageOrGenerate(string $disk, string $path, string $curve = self::DEFAULT_CURVE): self
+    {
+        if (self::storageHas($disk, $path)) {
+            return self::privateFromStorage($disk, $path);
+        }
+
+        $key = self::generate($curve);
+
+        self::persistPrivate($disk, $path, OpenSsl::exportPrivatePem($key->key));
+
+        return $key;
+    }
+
     public function algorithm(): Algorithm
     {
         return self::CURVES[$this->curve]['algorithm'];
+    }
+
+    /**
+     * The public (SPKI) PEM derived from this key — persist it alongside a
+     * generated private key so verifiers can load the public half.
+     *
+     * @throws KeyLoadException
+     */
+    public function publicPem(): string
+    {
+        $details = openssl_pkey_get_details($this->key);
+
+        if ($details === false) {
+            OpenSsl::drainErrors();
+
+            throw KeyLoadException::unreadable('public');
+        }
+
+        return (string) $details['key'];
     }
 
     /**
