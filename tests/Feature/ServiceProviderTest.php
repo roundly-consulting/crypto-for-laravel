@@ -38,6 +38,14 @@ it('resolves factory helpers through the Crypto facade', function (): void {
         ->and(Crypto::hotp(OtpAlgorithm::Sha1, 6)->at('JBSWY3DPEHPK3PXP', 0))->toHaveLength(6);
 });
 
+it('generates an HMAC secret through the facade without holding it', function (): void {
+    $secret = Crypto::generateHmacSecret(48);
+
+    expect($secret)->toBeInstanceOf(HmacSecret::class)
+        ->and(strlen($secret->value))->toBe(48)
+        ->and(Crypto::generateHmacSecret()->value)->not->toBe($secret->value);
+});
+
 it('surfaces the keyed signers through the facade', function (): void {
     $hs = Crypto::hs(HmacSecret::fromString('0123456789abcdef0123456789abcdef!'), Algorithm::HS384);
     $rs = Crypto::rs(RsaKey::public(keyPem('rsa-public')), Algorithm::RS512);
