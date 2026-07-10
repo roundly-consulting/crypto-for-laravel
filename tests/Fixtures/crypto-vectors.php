@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+ * COMMITTED STATIC crypto parity fixtures — generated ONCE, offline, by
+ * scratchpad/gen_fixtures.php on 2026-07-10. All values are hex-encoded byte
+ * strings (or PEM). No third-party crypto library is a dependency; these frozen
+ * vectors stand in for cross-implementation parity, exactly as each source
+ * package already ships. Regeneration is a manual, documented one-off.
+ *
+ * @return array<string, mixed>
+ */
+
+return [
+    'es256' => [
+        'cose' => 'a50102032620012158208ca0f664aeb605e508476f0aaf3c4695242066f87a91c4b566252475ea835710225820e38a9efb6d7708b3b496a2a86cacf1185b1727f133c1bb9abfe8ebdb8c0fdd08',
+        'message' => '63727970746f2d666f722d6c61726176656c20776562617574686e207369676e65642064617461',
+        'sig_der' => '3045022100946354c1393589ad6897f68b981399070ea28f47748ceeeedf584cc6a02f6f0d022054dc30801a1cfac4be0d1ee8cf7a2e0446ae1622567705ce4f4fc0c04243d7e4',
+        'sig_raw' => '946354c1393589ad6897f68b981399070ea28f47748ceeeedf584cc6a02f6f0d54dc30801a1cfac4be0d1ee8cf7a2e0446ae1622567705ce4f4fc0c04243d7e4',
+        'public_pem' => '-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEjKD2ZK62BeUIR28KrzxGlSQgZvh6
+kcS1ZiUkdeqDVxDjip77bXcIs7SWoqhsrPEYWxcn8TPBu5q/6OvbjA/dCA==
+-----END PUBLIC KEY-----
+',
+    ],
+    'rs256' => [
+        'cose' => 'a401030339010020590100d543141ab3e7bd6a442283aa4eec2e3ee22e726fce09ef324d073fcce099ce4fa5f96db8a38181ba9f82214f950beacb441aa3bfa622f0be163c5ecb9181ff605ced4093b9536363f01601560a313c3f6dd7032ea4fa04526e1d389f6d6e3197d53e2a8e649100c36aaddd145c979c15234687cecd577c6c76244117e5388b12a90cb29f2bac29c12a38f837715cc0a248b09ff4834681c381e71027e46ac8adb6ed597d0f99f606e595f3706dac440e8b6b0fcb7ee6ef33dd5f9ef69e164e7f5eabf279a8b06ba54e4f1a0cb13b7a6af158767999de48a70c77a32f90e224b28c238f67cb8d4d599b12f4a9dad52efe6e616029e45ec126aa24275954600b8f2143010001',
+        'message' => '63727970746f2d666f722d6c61726176656c20776562617574686e207369676e65642064617461',
+        'sig' => 'b3c8a39220ffc3f4a63d765441e507504b0b4e844b9f699d41479feea989090fc2e8cb9879880c14e638680f03cf3b7a2d743d7fbef6155457a9bdd75968702ad2c38020fd09b22368cfe502f7d179249026e47a6ba65bf479e977dec929c05e79906326ca62734abd143e3c75dd90d3cdf34300398241bd63a4e688a0e016746e435a00b37069b0c57be98f7098a994fe719917a5dcc2443397086db093a5e6d556134ad2643421739a70c0960e671d9a0f5238da412ce87361c5fde1d0c6e48ae63d8d7ea27aab68e40ac9365dd47772e76dacdb3c284747fda84fedf136b4e09cfe5da5d165cde46f5d04ae060394f3bfc8f0ac3558cd13c903ac0580cf44',
+        'public_pem' => '-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1UMUGrPnvWpEIoOqTuwu
+PuIucm/OCe8yTQc/zOCZzk+l+W24o4GBup+CIU+VC+rLRBqjv6Yi8L4WPF7LkYH/
+YFztQJO5U2Nj8BYBVgoxPD9t1wMupPoEUm4dOJ9tbjGX1T4qjmSRAMNqrd0UXJec
+FSNGh87NV3xsdiRBF+U4ixKpDLKfK6wpwSo4+DdxXMCiSLCf9INGgcOB5xAn5GrI
+rbbtWX0PmfYG5ZXzcG2sRA6Law/LfubvM91fnvaeFk5/Xqvyeaiwa6VOTxoMsTt6
+avFYdnmZ3kinDHejL5DiJLKMI49ny41NWZsS9Kna1S7+bmFgKeRewSaqJCdZVGAL
+jwIDAQAB
+-----END PUBLIC KEY-----
+',
+    ],
+    'eddsa' => [
+        'cose' => 'a40101032720062158208db4b3459285d1c934605bca50c7364bd3c72aa686c26dda7aab8b1b812163ff',
+        'message' => '63727970746f2d666f722d6c61726176656c20776562617574686e207369676e65642064617461',
+        'sig' => '85e9898fb3bb5e29be4be630373ebf7342b012a24037acacd43a80063c025232777a518b59a66938b4bd39e20dd5b7a15304af887aca1e594f278d833d80e902',
+        'public_raw' => '8db4b3459285d1c934605bca50c7364bd3c72aa686c26dda7aab8b1b812163ff',
+    ],
+    'auth_data' => [
+        'bytes' => 'a379a6f6eeafb9a55e378c118034e2751e682fab9f2d30ab13d2125586ce194745000000070000000000000000000000000000000000142d9e7991454ae8184bc4bad8c5e7d28dfa4ea51da50102032620012158208ca0f664aeb605e508476f0aaf3c4695242066f87a91c4b566252475ea835710225820e38a9efb6d7708b3b496a2a86cacf1185b1727f133c1bb9abfe8ebdb8c0fdd08',
+        'rp_id_hash' => 'a379a6f6eeafb9a55e378c118034e2751e682fab9f2d30ab13d2125586ce1947',
+        'sign_count' => 7,
+        'credential_id' => '2d9e7991454ae8184bc4bad8c5e7d28dfa4ea51d',
+    ],
+    'auth_data_assertion' => [
+        'bytes' => 'a379a6f6eeafb9a55e378c118034e2751e682fab9f2d30ab13d2125586ce19470500000009',
+        'sign_count' => 9,
+    ],
+    'ecdsa_der' => [
+        'high_bit_raw' => '80808080808080808080808080808080808080808080808080808080808080800101010101010101010101010101010101010101010101010101010101010101',
+        'leading_zero_raw' => '00000000000000000000000000000000000000000000000000000000000000050101010101010101010101010101010101010101010101010101010101010101',
+        'maximal_raw' => 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+    ],
+];
