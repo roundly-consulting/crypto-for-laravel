@@ -74,3 +74,17 @@ it('treats the hash algorithm as a real parameter', function (): void {
         ->and(strlen($jwk->thumbprintRaw()))->toBe(32)
         ->and(Base64Url::encode($jwk->thumbprintRaw()))->toBe($jwk->thumbprint());
 });
+
+it('rejects a member spelled with non-canonical base64url', function (): void {
+    // `x` re-spelled with a non-zero-unused-bit final char decodes to the same
+    // coordinate but would thumbprint differently — the ambiguity RFC 7638 kills.
+    // The strict codec must reject it on parse, before it can reach a thumbprint.
+    $canonical = Jwk::fromPublicKey(EcKey::private(keyPem('acme-account-ec')))->toArray();
+
+    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    $last = strpos($alphabet, substr($canonical['x'], -1));
+    $sibling = $alphabet[($last & 0x3C) + (($last & 0x03) === 0 ? 1 : -1)];
+    $canonical['x'] = substr($canonical['x'], 0, -1).$sibling;
+
+    Jwk::fromArray($canonical);
+})->throws(RoundlyConsulting\Crypto\Jose\MalformedJwkException::class);

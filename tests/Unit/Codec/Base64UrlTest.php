@@ -41,3 +41,24 @@ it('rejects an invalid base64url length', function (): void {
     // A single leftover char can never form a whole base64 group.
     Base64Url::decode('a');
 })->throws(InvalidEncodingException::class);
+
+it('rejects non-canonical input whose final character carries non-zero unused bits', function (string $bad): void {
+    // Each of these decodes to the same bytes as its canonical sibling; accepting
+    // them would make decode() non-injective (e.g. `QR` and `QQ` both → 0x41),
+    // which lets a JWS segment or JWK member be re-spelled without changing its
+    // decoded value. See the Base64Url decode canonicality guard.
+    Base64Url::decode($bad);
+})->throws(InvalidEncodingException::class)->with([
+    'QR for QQ' => ['QR'],
+    'QS for QQ' => ['QS'],
+    'trailing two-bit remainder' => ['AB'],
+]);
+
+it('is injective — distinct canonical strings never share decoded bytes', function (): void {
+    foreach (range(1, 40) as $length) {
+        $canonical = Base64Url::encode(random_bytes($length));
+
+        // The canonical encoding decodes and re-encodes to itself, exactly once.
+        expect(Base64Url::encode(Base64Url::decode($canonical)))->toBe($canonical);
+    }
+});

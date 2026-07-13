@@ -47,6 +47,15 @@ final class Base64Url
             throw InvalidEncodingException::base64Url();
         }
 
+        // Reject non-canonical input: a final character carrying non-zero unused
+        // bits decodes to the same bytes as its canonical sibling (e.g. `QR`→`QQ`),
+        // so without this two distinct strings would map to one value. Injectivity
+        // matters — a JWK member re-serialized for its RFC 7638 thumbprint, or a
+        // JWS segment used as a replay key, must have exactly one encoding.
+        if (self::encode($decoded) !== $text) {
+            throw InvalidEncodingException::base64Url();
+        }
+
         return $decoded;
     }
 }
