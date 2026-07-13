@@ -39,6 +39,40 @@ it('mints an RSA leaf whose private key signs for the certificate', function ():
         ->and($fixture->leaf()->publicKey()->verifier()->verify('payload', $signature))->toBeTrue();
 });
 
+it('certifies a leaf key the caller already holds', function (): void {
+    // A fixture whose certificate must certify a PRE-EXISTING key — an attestation
+    // credential certificate, whose SPKI has to equal a key the authenticator has
+    // already minted — cannot use a freshly generated one.
+    $key = EcKey::generate();
+
+    $fixture = TestCertificates::chain(length: 2, leafKey: $key);
+
+    $certified = $fixture->leaf()->publicKey();
+
+    expect($certified)->toBeInstanceOf(EcKey::class)
+        ->and($fixture->leafKey)->toBe($key)
+        ->and($fixture->chain->isLinked())->toBeTrue();
+
+    assert($certified instanceof EcKey);
+
+    expect($certified->coordinates()->x)->toBe($key->coordinates()->x)
+        ->and($certified->coordinates()->y)->toBe($key->coordinates()->y);
+});
+
+it('certifies a supplied RSA leaf key, ignoring the key type', function (): void {
+    $key = RsaKey::generate();
+
+    $fixture = TestCertificates::chain(length: 1, leafKeyType: 'EC', leafKey: $key);
+
+    $certified = $fixture->leaf()->publicKey();
+
+    expect($certified)->toBeInstanceOf(RsaKey::class);
+
+    assert($certified instanceof RsaKey);
+
+    expect($certified->modulus())->toBe($key->modulus());
+});
+
 it('puts the requested names into subjectAltName', function (): void {
     $fixture = TestCertificates::chain(dnsNames: ['a.example', 'b.example']);
 

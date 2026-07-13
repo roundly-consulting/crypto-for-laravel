@@ -49,7 +49,9 @@ final class TestCertificates
      * i.e. leaf → intermediate → root). CA keys are EC P-256; the leaf's key type
      * is `EC` or `RSA`. `$days` is the validity window's length — see the class
      * docblock for how to test expiry. `$leafOptions` decorates the LEAF with the
-     * extensions/subject shape a consumer's fixture needs.
+     * extensions/subject shape a consumer's fixture needs. `$leafKey` certifies a
+     * key the caller already holds instead of a fresh one (and then `$leafKeyType`
+     * is moot).
      *
      * @param  list<string>  $dnsNames
      *
@@ -62,9 +64,15 @@ final class TestCertificates
         array $dnsNames = [],
         int $days = 365,
         ?TestLeafOptions $leafOptions = null,
+        EcKey|RsaKey|null $leafKey = null,
     ): TestCertificateChain {
         $length = max(1, $length);
-        $leafKey = self::key($leafKeyType);
+
+        // An EXISTING leaf key can be supplied, which is what a fixture needs when
+        // the certificate must certify a key that already exists — an attestation
+        // credential certificate, say, whose SPKI has to equal the credential key
+        // the authenticator already minted. Otherwise a throwaway one is generated.
+        $leafKey ??= self::key($leafKeyType);
 
         // The root signs itself; each certificate below it is signed by the one
         // above, so the chain is genuinely linked rather than merely ordered.
