@@ -48,7 +48,8 @@ final class TestCertificates
      * A fresh throwaway chain, leaf → … → root ($length certificates, default 3,
      * i.e. leaf → intermediate → root). CA keys are EC P-256; the leaf's key type
      * is `EC` or `RSA`. `$days` is the validity window's length — see the class
-     * docblock for how to test expiry.
+     * docblock for how to test expiry. `$leafOptions` decorates the LEAF with the
+     * extensions/subject shape a consumer's fixture needs.
      *
      * @param  list<string>  $dnsNames
      *
@@ -60,6 +61,7 @@ final class TestCertificates
         string $commonName = 'leaf.crypto-test.example',
         array $dnsNames = [],
         int $days = 365,
+        ?TestLeafOptions $leafOptions = null,
     ): TestCertificateChain {
         $length = max(1, $length);
         $leafKey = self::key($leafKeyType);
@@ -81,6 +83,7 @@ final class TestCertificates
                 issuerKey: $issuerKey,
                 issuerPem: $issuerPem,
                 days: $days,
+                options: $depth === 0 ? $leafOptions : null,
             );
 
             $issuerKey = $key->key;
@@ -105,6 +108,7 @@ final class TestCertificates
         string $keyType = 'RSA',
         int $days = 90,
         string $commonName = 'crypto-test.example',
+        ?TestLeafOptions $options = null,
     ): TestCertificateChain {
         $key = self::key($keyType);
 
@@ -116,6 +120,7 @@ final class TestCertificates
             issuerKey: null,
             issuerPem: null,
             days: $days,
+            options: $options,
         );
 
         return new TestCertificateChain(new Chain([Certificate::fromPem($pem)]), $key);
@@ -169,21 +174,18 @@ final class TestCertificates
         ?OpenSSLAsymmetricKey $issuerKey,
         ?string $issuerPem,
         int $days,
+        ?TestLeafOptions $options,
     ): string {
-        $config = self::writeConfig($dnsNames);
+        $config = self::writeConfig($dnsNames, $options);
 
         try {
-            $options = [
+            $arguments = [
                 'config' => $config,
                 'digest_alg' => 'sha256',
                 'x509_extensions' => $isAuthority ? 'v3_ca' : 'v3_leaf',
             ];
 
-            $csr = @openssl_csr_new(
-                ['commonName' => $commonName, 'organizationName' => 'Crypto Test', 'countryName' => 'SK'],
-                $key,
-                $options,
-            );
+            $csr = @openssl_csr_new(self::subject($commonName, $options), $key, $arguments);
 
             if (! $csr instanceof OpenSSLCertificateSigningRequest) {
                 OpenSsl::drainErrors();
@@ -196,7 +198,7 @@ final class TestCertificates
                 $issuerPem,
                 $issuerKey ?? $key,
                 $days,
-                $options,
+                $arguments,
                 random_int(1, PHP_INT_MAX),
             );
 
@@ -213,6 +215,33 @@ final class TestCertificates
     }
 
     /**
+     * The subject DN to request. An empty array is a legal, empty subject Name —
+     * what a TPM AIK certificate carries (RFC 5280 §4.1.2.6).
+     *
+     * @return array<string, string>
+     */
+    private static function subject(string $commonName, ?TestLeafOptions $options): array
+    {
+        $options ??= new TestLeafOptions;
+
+        if ($options->emptySubject) {
+            return [];
+        }
+
+        $subject = [
+            'commonName' => $commonName,
+            'organizationName' => 'Crypto Test',
+            'countryName' => 'SK',
+        ];
+
+        if ($options->subjectOrganizationalUnit !== null) {
+            $subject['organizationalUnitName'] = $options->subjectOrganizationalUnit;
+        }
+
+        return $subject;
+    }
+
+    /**
      * Write the temporary `openssl.cnf` this class signs against.
      *
      * The host's default config is not trusted: it commonly lacks the `req` and
@@ -222,15 +251,46 @@ final class TestCertificates
      *
      * @param  list<string>  $dnsNames
      */
-    private static function writeConfig(array $dnsNames): string
+    private static function writeConfig(array $dnsNames, ?TestLeafOptions $options): string
     {
+        $options ??= new TestLeafOptions;
         $alt = '';
 
         foreach ($dnsNames as $index => $name) {
             $alt .= 'DNS.'.($index + 1)." = {$name}\n";
         }
 
-        $san = $dnsNames === [] ? '' : "subjectAltName = @alt_names\n";
+        $directoryName = $options->directoryNameSan;
+        $dirSection = '';
+
+        if ($directoryName !== []) {
+            $alt .= "dirName = san_dir\n";
+            $index = 0;
+
+            // OpenSSL ignores a DN key's leading `<prefix>.` — so a bare numeric
+            // OID like `2.23.133.2.1` is read as `23.133.2.1` and refused. The
+            // ordering prefix every openssl.cnf uses restores the whole OID.
+            foreach ($directoryName as $attribute => $value) {
+                $dirSection .= ($index++).".{$attribute} = {$value}\n";
+            }
+        }
+
+        // RFC 5280 requires a critical SAN when the subject is empty, which is
+        // exactly the shape a dirName SAN is minted for.
+        $critical = $directoryName === [] ? '' : 'critical,';
+        $san = $alt === '' ? '' : "subjectAltName = {$critical}@alt_names\n";
+
+        $eku = $options->extendedKeyUsageOids;
+        $extendedKeyUsage = $eku === [] ? 'serverAuth' : implode(',', $eku);
+
+        // `<oid> = [critical,]DER:<hex>` puts arbitrary bytes into an arbitrary
+        // extension — how an Apple nonce or an Android key description is minted.
+        $flag = $options->criticalRawExtensions ? 'critical,' : '';
+        $raw = '';
+
+        foreach ($options->rawExtensions as $oid => $der) {
+            $raw .= "{$oid} = {$flag}DER:".bin2hex($der)."\n";
+        }
 
         $config = <<<CNF
             [ req ]
@@ -247,11 +307,13 @@ final class TestCertificates
             [ v3_leaf ]
             basicConstraints = critical,CA:FALSE
             keyUsage = critical,digitalSignature
-            extendedKeyUsage = serverAuth
+            extendedKeyUsage = {$extendedKeyUsage}
             subjectKeyIdentifier = hash
-            {$san}
+            {$san}{$raw}
             [ alt_names ]
             {$alt}
+            [ san_dir ]
+            {$dirSection}
             CNF;
 
         $path = (string) tempnam(sys_get_temp_dir(), 'crypto-x509-');
