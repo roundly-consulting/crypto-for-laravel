@@ -7,6 +7,10 @@ namespace RoundlyConsulting\Crypto\X509;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use OpenSSLCertificate;
+use RoundlyConsulting\Crypto\Asn1\DerDecoder;
+use RoundlyConsulting\Crypto\Asn1\DerElement;
+use RoundlyConsulting\Crypto\Asn1\MalformedDerException;
+use RoundlyConsulting\Crypto\Asn1\TagClass;
 use RoundlyConsulting\Crypto\Codec\Base64;
 use RoundlyConsulting\Crypto\Codec\InvalidEncodingException;
 use RoundlyConsulting\Crypto\Hash\Digest;
@@ -34,6 +38,7 @@ final readonly class Certificate
 
     /**
      * @param  list<string>  $dnsNames
+     * @param  array<string, Extension>  $extensions  keyed by OID
      */
     private function __construct(
         private OpenSSLCertificate $handle,
@@ -46,6 +51,9 @@ final readonly class Certificate
         private ?string $signatureAlgorithm,
         private CarbonImmutable $notBefore,
         private CarbonImmutable $notAfter,
+        private int $version,
+        private bool $subjectIsEmpty,
+        private array $extensions,
     ) {}
 
     /**
@@ -172,6 +180,58 @@ final readonly class Certificate
     }
 
     /**
+     * The extension carrying this OID, or null when the certificate has none.
+     *
+     * A FACT, and only a fact: you get the criticality flag and the RAW DER
+     * inside the `extnValue` OCTET STRING. This package does not interpret those
+     * bytes — decode them with {@see DerDecoder}
+     * and rule on them in your own domain.
+     *
+     * The bytes come from a real DER walk of the certificate, not from
+     * `openssl_x509_parse()`, whose extension values are pretty-printed text for
+     * every OID it does not model — useless as bytes.
+     *
+     * RFC 5280 §4.2 forbids a repeated extension; should a certificate carry one
+     * anyway, the FIRST occurrence is reported (as OpenSSL's own lookups do).
+     */
+    public function extension(string $oid): ?Extension
+    {
+        return $this->extensions[$oid] ?? null;
+    }
+
+    /**
+     * Every extension, keyed by OID, in encoding order.
+     *
+     * @return array<string, Extension>
+     */
+    public function extensions(): array
+    {
+        return $this->extensions;
+    }
+
+    /**
+     * The X.509 version number: 1, 2, or 3 (the encoded field is 0-based, and
+     * absent means v1).
+     */
+    public function version(): int
+    {
+        return $this->version;
+    }
+
+    /**
+     * Whether the subject Name is an empty SEQUENCE (RFC 5280 §4.1.2.6 — legal,
+     * and what a TPM attestation-identity certificate does).
+     *
+     * `openssl_x509_parse()` cannot answer this faithfully: it drops RDNs it does
+     * not model, so an unmodelled subject and an absent one look identical. The
+     * DER walk can tell them apart.
+     */
+    public function subjectIsEmpty(): bool
+    {
+        return $this->subjectIsEmpty;
+    }
+
+    /**
      * The serial number as upper-case hex.
      */
     public function serialNumber(): ?string
@@ -262,19 +322,120 @@ final readonly class Certificate
         $pem = OpenSslX509::exportPem($handle);
         $parsed = OpenSslX509::parse($handle);
         $serial = self::text($parsed, 'serialNumberHex');
+        $der = self::derFromPem($pem);
 
-        return new self(
-            handle: $handle,
-            pem: $pem,
-            der: self::derFromPem($pem),
-            subject: self::name($parsed['subject'] ?? null),
-            issuer: self::name($parsed['issuer'] ?? null),
-            dnsNames: self::dnsNamesFrom($parsed['extensions'] ?? null),
-            serialNumber: $serial === null ? null : strtoupper($serial),
-            signatureAlgorithm: self::text($parsed, 'signatureTypeLN'),
-            notBefore: self::instantFrom($parsed, 'validFrom_time_t'),
-            notAfter: self::instantFrom($parsed, 'validTo_time_t'),
-        );
+        // The structural walk runs on the certificate's OWN DER, because
+        // openssl_x509_parse() pretty-prints unknown extensions into lossy text.
+        // It is eager (the class's rule): a certificate that constructed has been
+        // walked, so no getter can spring a parse error later. Whatever the walk
+        // refuses lands as the same `unparseable()` an OpenSSL parse failure does
+        // — one failure class for one question, "can this be read at all".
+        try {
+            $tbs = self::tbsCertificate($der);
+
+            return new self(
+                handle: $handle,
+                pem: $pem,
+                der: $der,
+                subject: self::name($parsed['subject'] ?? null),
+                issuer: self::name($parsed['issuer'] ?? null),
+                dnsNames: self::dnsNamesFrom($parsed['extensions'] ?? null),
+                serialNumber: $serial === null ? null : strtoupper($serial),
+                signatureAlgorithm: self::text($parsed, 'signatureTypeLN'),
+                notBefore: self::instantFrom($parsed, 'validFrom_time_t'),
+                notAfter: self::instantFrom($parsed, 'validTo_time_t'),
+                version: self::versionFrom($tbs),
+                subjectIsEmpty: self::subjectIsEmptyIn($tbs),
+                extensions: self::extensionsFrom($tbs),
+            );
+        } catch (MalformedDerException) {
+            throw MalformedCertificateException::unparseable();
+        }
+    }
+
+    /**
+     * Certificate ::= SEQUENCE { tbsCertificate, signatureAlgorithm, signature }.
+     *
+     * @throws MalformedDerException
+     */
+    private static function tbsCertificate(string $der): DerElement
+    {
+        return (new DerDecoder)->decode($der)->children()[0] ?? throw MalformedDerException::truncated();
+    }
+
+    /**
+     * TBSCertificate ::= SEQUENCE { version [0] EXPLICIT DEFAULT v1, … } — an
+     * absent version field means v1, and the encoded value is 0-based.
+     *
+     * @throws MalformedDerException|MalformedCertificateException
+     */
+    private static function versionFrom(DerElement $tbs): int
+    {
+        $field = $tbs->children()[0] ?? throw MalformedDerException::truncated();
+
+        if ($field->class !== TagClass::ContextSpecific || $field->tag !== 0) {
+            return 1;
+        }
+
+        $encoded = $field->children()[0] ?? throw MalformedDerException::truncated();
+        $version = $encoded->integer();
+
+        return is_int($version) && $version >= 0 && $version <= 2
+            ? $version + 1
+            : throw MalformedCertificateException::unparseable();
+    }
+
+    /**
+     * The subject Name sits five fields after the optional version: serialNumber,
+     * signature, issuer, validity, subject.
+     *
+     * @throws MalformedDerException
+     */
+    private static function subjectIsEmptyIn(DerElement $tbs): bool
+    {
+        $fields = $tbs->children();
+        $first = $fields[0] ?? throw MalformedDerException::truncated();
+        $offset = $first->class === TagClass::ContextSpecific && $first->tag === 0 ? 1 : 0;
+        $subject = $fields[$offset + 4] ?? throw MalformedDerException::truncated();
+
+        return $subject->children() === [];
+    }
+
+    /**
+     * extensions [3] EXPLICIT SEQUENCE OF Extension ::= SEQUENCE {
+     *     extnID OBJECT IDENTIFIER, critical BOOLEAN DEFAULT FALSE,
+     *     extnValue OCTET STRING }
+     *
+     * @return array<string, Extension>
+     *
+     * @throws MalformedDerException
+     */
+    private static function extensionsFrom(DerElement $tbs): array
+    {
+        $wrapper = $tbs->tagged(3);
+
+        if ($wrapper === null) {
+            return [];
+        }
+
+        $list = $wrapper->children()[0] ?? throw MalformedDerException::truncated();
+        $extensions = [];
+
+        foreach ($list->children() as $entry) {
+            $fields = $entry->children();
+            $oid = ($fields[0] ?? throw MalformedDerException::truncated())->oid();
+
+            // extnValue is the last field either way; the criticality BOOLEAN is
+            // omitted when it is false, which is the DEFAULT.
+            $value = ($fields[count($fields) - 1] ?? throw MalformedDerException::truncated())->octetString();
+            $critical = count($fields) === 3 && $fields[1]->boolean();
+
+            // A repeat is malformed per RFC 5280 §4.2; report the first, which is
+            // what OpenSSL's own extension lookups do.
+            $extensions[$oid] ??= new Extension($oid, $critical, $value);
+        }
+
+        return $extensions;
     }
 
     /**

@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Crypto\Asn1\DerDecoder;
+use RoundlyConsulting\Crypto\Asn1\DerElement;
 use RoundlyConsulting\Crypto\X509\Certificate;
 use RoundlyConsulting\Crypto\X509\Chain;
 use RoundlyConsulting\Crypto\X509\DistinguishedName;
+use RoundlyConsulting\Crypto\X509\Extension;
 use RoundlyConsulting\Crypto\X509\OpenSslX509;
 
 /**
@@ -32,7 +35,12 @@ it('never speaks the vocabulary of trust in the X509 module', function (string $
     Certificate::class,
     Chain::class,
     DistinguishedName::class,
+    Extension::class,
     OpenSslX509::class,
+    // The DER decoder is held to the same bar: it turns bytes into structure and
+    // is not allowed to grow an opinion about them.
+    DerDecoder::class,
+    DerElement::class,
 ]);
 
 it('never calls a chain valid', function (): void {
