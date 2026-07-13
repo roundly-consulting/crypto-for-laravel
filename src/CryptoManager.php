@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Crypto;
 
+use RoundlyConsulting\Crypto\Asn1\DerDecoder;
 use RoundlyConsulting\Crypto\Codec\Base32;
 use RoundlyConsulting\Crypto\Codec\Base64;
 use RoundlyConsulting\Crypto\Codec\Base64Url;
@@ -126,6 +127,17 @@ final class CryptoManager
     public function chainFromPemBundle(string $bundle): Chain
     {
         return Chain::fromPemBundle($bundle);
+    }
+
+    // ── ASN.1 / DER (X.690) ─────────────────────────────────────────────────
+
+    /**
+     * A strict DER reader — the CBOR decoder's counterpart for the other encoding
+     * certificates arrive in. A parser, never a trust store.
+     */
+    public function derDecoder(): DerDecoder
+    {
+        return new DerDecoder;
     }
 
     // ── Hashing ─────────────────────────────────────────────────────────────

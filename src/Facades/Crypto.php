@@ -15,6 +15,7 @@ use RoundlyConsulting\Crypto\CryptoManager;
  * @method static \RoundlyConsulting\Crypto\X509\Certificate certificate(string $pem)
  * @method static \RoundlyConsulting\Crypto\X509\Chain chainFromX5c(list<string> $x5c)
  * @method static \RoundlyConsulting\Crypto\X509\Chain chainFromPemBundle(string $bundle)
+ * @method static \RoundlyConsulting\Crypto\Asn1\DerDecoder derDecoder()
  * @method static \RoundlyConsulting\Crypto\Hash\Hmac hmac(\RoundlyConsulting\Crypto\Hash\HashAlgorithm $algorithm = \RoundlyConsulting\Crypto\Hash\HashAlgorithm::Sha256)
  * @method static \RoundlyConsulting\Crypto\Hash\Digest digest(\RoundlyConsulting\Crypto\Hash\HashAlgorithm $algorithm = \RoundlyConsulting\Crypto\Hash\HashAlgorithm::Sha256)
  * @method static bool constantTimeEquals(string $known, string $user)

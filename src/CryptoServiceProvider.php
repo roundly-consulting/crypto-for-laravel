@@ -6,6 +6,7 @@ namespace RoundlyConsulting\Crypto;
 
 use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Support\ServiceProvider;
+use RoundlyConsulting\Crypto\Asn1\DerDecoder;
 use RoundlyConsulting\Crypto\Cose\CborDecoder;
 use RoundlyConsulting\Crypto\Jose\Jws;
 use RoundlyConsulting\Crypto\Signature\KeyVerifier;
@@ -25,6 +26,7 @@ final class CryptoServiceProvider extends ServiceProvider
     {
         $this->app->singleton(Jws::class, static fn (): Jws => new Jws);
         $this->app->singleton(CborDecoder::class, static fn (): CborDecoder => new CborDecoder);
+        $this->app->singleton(DerDecoder::class, static fn (): DerDecoder => new DerDecoder);
         $this->app->singleton(KeyVerifier::class, static fn (): KeyVerifier => new KeyVerifier);
         $this->app->singleton(CryptoManager::class, static fn (): CryptoManager => new CryptoManager);
     }
