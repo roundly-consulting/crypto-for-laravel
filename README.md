@@ -327,6 +327,19 @@ $ec  = EcKey::fromStorageOrGenerate('local', 'keys/ec.pem', curve: 'P-384');
 $okp = OkpKey::fromStorageOrGenerate('local', 'keys/ed25519.key'); // 64-byte secret, ext-sodium
 ```
 
+Storing keys somewhere other than a Laravel disk? `RsaKey` and `EcKey` export both halves —
+`privatePem()` for the private (PKCS#8) PEM and `publicPem()` for the public (SPKI) one:
+
+```php
+$key = RsaKey::generate(2048);
+
+file_put_contents('/etc/app/private.pem', $key->privatePem()); // secret — chmod 0600
+file_put_contents('/etc/app/public.pem', $key->publicPem());
+```
+
+`privatePem()` throws `KeyLoadException::notPrivate()` on a **public** key, so a verify-only key
+can never be mistaken for signing material.
+
 For discoverability the `Crypto` facade surfaces the new HMAC generator too —
 `Crypto::generateHmacSecret(48)` — returning the secret without ever caching it.
 

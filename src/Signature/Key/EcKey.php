@@ -182,7 +182,7 @@ final readonly class EcKey implements PublicKey
 
         $key = self::generate($curve);
 
-        self::persistPrivate($disk, $path, OpenSsl::exportPrivatePem($key->key));
+        self::persistPrivate($disk, $path, $key->privatePem());
 
         return $key;
     }
@@ -209,6 +209,25 @@ final readonly class EcKey implements PublicKey
         }
 
         return (string) $details['key'];
+    }
+
+    /**
+     * The private (PKCS#8) PEM for this key — the single, typed export path for
+     * private key material, for callers that persist a generated key somewhere
+     * other than a Laravel disk (a filesystem path, a secret store, …).
+     *
+     * The returned string is secret: write it to owner-only storage, never log
+     * it, and don't pass it anywhere it could end up in a stack trace.
+     *
+     * @throws KeyLoadException when this is a public key, or the export fails
+     */
+    public function privatePem(): string
+    {
+        if (! $this->isPrivate) {
+            throw KeyLoadException::notPrivate('EC');
+        }
+
+        return OpenSsl::exportPrivatePem($this->key);
     }
 
     /**

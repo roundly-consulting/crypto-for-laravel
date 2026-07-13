@@ -42,6 +42,11 @@ final class KeyLoadException extends CryptoException
         return new self('Key generation failed.');
     }
 
+    public static function notPrivate(string $kind): self
+    {
+        return new self("The {$kind} key is a public key and holds no private material to export.");
+    }
+
     public static function exportFailed(): self
     {
         return new self('The private key could not be exported to PEM.');

@@ -58,6 +58,41 @@ it('generates an HMAC secret at the byte ceiling', function (): void {
     expect(strlen(HmacSecret::generate(1024)->value))->toBe(1024);
 });
 
+it('exports an RSA private PEM that round-trips into a signing key', function (): void {
+    $generated = RsaKey::generate(2048);
+
+    $pem = $generated->privatePem();
+    $reloaded = RsaKey::private($pem);
+
+    $signature = (new Rs($reloaded))->sign('message');
+
+    expect($pem)->toContain('PRIVATE KEY')
+        ->and($reloaded->isPrivate)->toBeTrue()
+        ->and((new Rs(RsaKey::public($generated->publicPem())))->verify('message', $signature))->toBeTrue();
+});
+
+it('exports an EC private PEM that round-trips into a signing key', function (string $curve): void {
+    $generated = EcKey::generate($curve);
+
+    $pem = $generated->privatePem();
+    $reloaded = EcKey::private($pem);
+
+    $signature = (new Es($reloaded))->sign('message');
+
+    expect($pem)->toContain('PRIVATE KEY')
+        ->and($reloaded->isPrivate)->toBeTrue()
+        ->and($reloaded->curve)->toBe($curve)
+        ->and((new Es(EcKey::public($generated->publicPem())))->verify('message', $signature))->toBeTrue();
+})->with(['P-256', 'P-384', 'P-521']);
+
+it('refuses to export a private PEM from an RSA public key', function (): void {
+    RsaKey::public(RsaKey::generate(2048)->publicPem())->privatePem();
+})->throws(KeyLoadException::class, 'The RSA key is a public key and holds no private material to export.');
+
+it('refuses to export a private PEM from an EC public key', function (): void {
+    EcKey::public(EcKey::generate()->publicPem())->privatePem();
+})->throws(KeyLoadException::class, 'The EC key is a public key and holds no private material to export.');
+
 it('rejects an unreadable RSA private PEM', function (): void {
     RsaKey::private('not a private key');
 })->throws(KeyLoadException::class);
