@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Crypto\Asn1\DerDecoder;
 use RoundlyConsulting\Crypto\Codec\Base32;
 use RoundlyConsulting\Crypto\Codec\Base64;
 use RoundlyConsulting\Crypto\Codec\Base64Url;
@@ -99,6 +100,32 @@ it('never leaks a native error from JWS verify', function (): void {
 
 it('never leaks a native error from CBOR decode', function (): void {
     fuzzSink(fn (string $input): mixed => (new CborDecoder)->decode($input), hex2bin(cryptoVectors()['es256']['cose']));
+});
+
+it('never leaks a native error from DER decode', function (): void {
+    // Seed with a real certificate's DER — the mutated corpus then walks every
+    // tag/length boundary a hostile extension could aim at.
+    $seed = TestCertificates::chain(length: 1)->leaf()->der();
+
+    fuzzSink(function (string $input): mixed {
+        $decoder = new DerDecoder;
+        $decoder->decodeFirst($input);
+
+        // The typed readers are attacker-facing too: whatever the tag turned out
+        // to be, reading it as the wrong type must be a typed rejection.
+        $element = $decoder->decode($input);
+        $element->isNull();
+
+        foreach ([$element->oid(...), $element->integer(...), $element->octetString(...), $element->boolean(...), $element->children(...)] as $reader) {
+            try {
+                $reader();
+            } catch (CryptoException) {
+                // The one permitted outcome.
+            }
+        }
+
+        return $element;
+    }, $seed);
 });
 
 it('never leaks a native error from authenticatorData parse', function (): void {
