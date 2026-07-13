@@ -17,7 +17,8 @@ pulling in anything else.
 - **JWK** (RFC 7517) public-key serialization both ways, with **RFC 7638 thumbprints** — the
   value an ACME key authorization is built from — and a deliberately strict parser.
 - **X.509** (RFC 5280) certificate and chain primitives: fingerprints, subject/issuer/SAN,
-  validity dates, public keys, `x5c`/PEM/DER — facts only, **never a trust ruling**.
+  validity dates, public keys, raw extensions, `x5c`/PEM/DER — facts only, **never a trust ruling**.
+- **ASN.1 / DER** (X.690) a strict, canonical, bounded decoder — a parser, never a trust store.
 - **RFC 4226 / RFC 6238** HOTP and TOTP built on `hash_hmac` and a native RFC 4648 base32 codec.
 - **WebAuthn** COSE key parsing (P-256/P-384/P-521, RSA, Ed25519), a minimal defensive CBOR
   decoder, and signature verification.
@@ -48,6 +49,7 @@ is a dependency.
 | JWK thumbprint | `Jose\Jwk::thumbprint()` | RFC 7638 | SHA-256 by default; the ACME key-authorization input (RFC 8555 §8.1) |
 | X.509 certificate | `X509\Certificate` | RFC 5280 / 7468 / 7515 §4.1.6 | PEM, DER, `x5c` base64; RSA + EC keys |
 | X.509 chain | `X509\Chain` | RFC 5280 §6 (path *construction* only) | `isLinked()` proves the math — **not** path validation |
+| DER | `Asn1\DerDecoder` | ITU-T X.690 (canonical DER) | strict: no indefinite lengths, no padded encodings, no trailing bytes |
 
 The `Es` signer/verifier picks its digest and coordinate size from the key's own curve, so
 there is no way to mismatch a curve against a tier. `Hs`/`Rs` take the tier as an argument
@@ -259,6 +261,40 @@ $certificate->isNotYetValidAt();                            // a negative leeway
 > and enforced by an architecture test. `Chain::isLinked()` says *these certificates sign each
 > other*; it does **not** say the last one is an authority you have ever heard of. Pin your own
 > anchors, and decide for yourself what an expired certificate means.
+
+### ASN.1 / DER (`Asn1\*`)
+
+A strict X.690 reader — the CBOR decoder's counterpart for the other encoding certificates
+arrive in. It exists because `openssl_x509_parse()` pretty-prints unknown extensions into lossy
+text, so anything that needs an extension's actual **bytes** needs a real DER walk:
+
+```php
+use RoundlyConsulting\Crypto\Asn1\DerDecoder;
+
+// The Apple WebAuthn nonce extension: SEQUENCE { [1] { OCTET STRING nonce } }
+$element = (new DerDecoder)->decode($certificate->extension('1.2.840.113635.100.8.2')?->der ?? '');
+
+$nonce = $element->tagged(1)?->children()[0]->octetString();
+
+$element->children();          // list<DerElement>, in encoding order
+$element->oid();               // '1.2.840.113635.100.8.2' — dotted decimal
+$element->integer();           // int, or raw bytes when wider than 64 bits
+$element->boolean();           // DER's 0x00 / 0xFF only
+$element->isNull();
+
+(new DerDecoder)->decodeFirst($bytes);   // element + bytesRead, for walking a run of TLVs
+```
+
+Everything hostile is a `MalformedDerException`, never a warning: indefinite lengths (that is
+BER), non-minimal length or tag encodings, padded INTEGERs and OID subidentifiers, BER-lax
+BOOLEANs, a declared length past the end of the buffer, trailing bytes after the top-level
+element, and a constructed/primitive form mismatch. Work is bounded three ways — 64 KiB of
+input, 16 levels of nesting, 4096 elements — so a nested-SEQUENCE bomb costs an exception
+rather than the stack.
+
+> **A parser, never a trust store.** `DerDecoder` turns bytes into structure and stops there. It
+> does not know what a certificate extension, an attestation, or an authority is — what an
+> extension's contents *mean* is your call, made in your code.
 
 ### WebAuthn signature verification (`Cose\*`, `Signature\KeyVerifier`)
 
