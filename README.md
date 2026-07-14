@@ -67,6 +67,9 @@ a secret. Pin the exact algorithm on `verify()` — the package never infers it 
 - Extensions: `ext-openssl`, `ext-hash`, `ext-mbstring` (required); `ext-sodium` (suggested —
   needed only for EdDSA / Ed25519 signing, verification, and key generation; it ships enabled by
   default on modern PHP).
+- Runtime dependencies: Laravel/Symfony only, plus our own
+  `roundly-consulting/package-toolkit-for-laravel` (the service-provider bootstrap toolkit).
+  **No third-party crypto library is ever pulled in.**
 - **Key generation** (`RsaKey::generate()`, `EcKey::generate()`) needs a usable OpenSSL
   configuration (`openssl.cnf`). Loading PEMs, signing, and verifying do not. On a host with a
   missing/broken config, `generate()` throws a typed `Signature\KeyLoadException` rather than
