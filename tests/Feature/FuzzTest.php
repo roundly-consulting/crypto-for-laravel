@@ -16,6 +16,9 @@ use RoundlyConsulting\Crypto\Signature\Ec\Der;
 use RoundlyConsulting\Crypto\Signature\Hs;
 use RoundlyConsulting\Crypto\Signature\Key\EcKey;
 use RoundlyConsulting\Crypto\Signature\Key\HmacSecret;
+use RoundlyConsulting\Crypto\Testing\TestCertificates;
+use RoundlyConsulting\Crypto\X509\Certificate;
+use RoundlyConsulting\Crypto\X509\Chain;
 
 /*
  * Fuzz targets for the attacker-facing byte sinks. Each feeds random and
@@ -131,6 +134,43 @@ it('never leaks a native error from JWK parsing', function (): void {
             } catch (CryptoException) {
                 // The one permitted outcome.
             }
+        }
+    }
+
+    expect(true)->toBeTrue();
+});
+
+it('never leaks a native error from certificate parsing', function (): void {
+    $leaf = TestCertificates::chain(length: 1)->leaf();
+
+    fuzzSink(fn (string $input): mixed => Certificate::fromPem($input), $leaf->pem());
+    fuzzSink(fn (string $input): mixed => Certificate::fromDer($input), $leaf->der());
+    fuzzSink(fn (string $input): mixed => Certificate::fromBase64($input), $leaf->base64());
+    fuzzSink(fn (string $input): mixed => Chain::fromPemBundle($input), $leaf->pem());
+});
+
+it('never leaks a native error from x5c chain parsing', function (): void {
+    $x5c = TestCertificates::chain()->x5c();
+
+    // Mutated arrays: wrong lengths, huge entries, mixed valid and garbage.
+    $corpora = [
+        [],
+        [''],
+        $x5c,
+        [...$x5c, 'garbage'],
+        ['garbage', ...$x5c],
+        [str_repeat('A', 100_000)],
+        array_fill(0, 20, $x5c[0]),
+        [$x5c[0], base64_encode(random_bytes(64))],
+        [strtr($x5c[0], '+/', '-_')],
+        [substr($x5c[0], 0, 40)],
+    ];
+
+    foreach ($corpora as $x5cInput) {
+        try {
+            Chain::fromX5c($x5cInput);
+        } catch (CryptoException) {
+            // The one permitted outcome.
         }
     }
 
