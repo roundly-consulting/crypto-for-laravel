@@ -9,10 +9,12 @@ use RoundlyConsulting\Crypto\Codec\Hex;
 use RoundlyConsulting\Crypto\Cose\AuthenticatorData;
 use RoundlyConsulting\Crypto\Cose\CborDecoder;
 use RoundlyConsulting\Crypto\Exceptions\CryptoException;
+use RoundlyConsulting\Crypto\Jose\Jwk;
 use RoundlyConsulting\Crypto\Jose\Jws;
 use RoundlyConsulting\Crypto\Signature\Algorithm;
 use RoundlyConsulting\Crypto\Signature\Ec\Der;
 use RoundlyConsulting\Crypto\Signature\Hs;
+use RoundlyConsulting\Crypto\Signature\Key\EcKey;
 use RoundlyConsulting\Crypto\Signature\Key\HmacSecret;
 
 /*
@@ -109,6 +111,30 @@ it('never leaks a native error from ECDSA DER parsing', function (): void {
 
         return Der::toRaw($input, 32);
     }, $seed);
+});
+
+it('never leaks a native error from JWK parsing', function (): void {
+    $seed = json_encode(Jwk::fromPublicKey(EcKey::generate())->toArray(), JSON_THROW_ON_ERROR);
+
+    fuzzSink(fn (string $input): mixed => Jwk::fromJson($input), $seed);
+
+    // The array entry point takes arbitrary decoded JSON, so fuzz the value
+    // types too — a member that is an int, an array, or a bool must be a typed
+    // rejection, never a TypeError.
+    $members = Jwk::fromPublicKey(EcKey::generate())->toArray();
+    $junk = [random_bytes(8), 42, 0.5, true, null, ['nested'], str_repeat('A', 9000)];
+
+    foreach (array_keys($members) + ['d' => 'd', 'x5c' => 'x5c'] as $member) {
+        foreach ($junk as $value) {
+            try {
+                Jwk::fromArray([...$members, (string) $member => $value]);
+            } catch (CryptoException) {
+                // The one permitted outcome.
+            }
+        }
+    }
+
+    expect(true)->toBeTrue();
 });
 
 it('never leaks a native error from the codecs', function (): void {
