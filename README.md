@@ -14,6 +14,10 @@ pulling in anything else.
 
 - **JOSE / JWS** compact and flattened signing + strict verification across the whole SHA-2
   tier (HS256/384/512, RS256/384/512, ES256/384/512) plus EdDSA (Ed25519).
+- **JWK** (RFC 7517) public-key serialization both ways, with **RFC 7638 thumbprints** — the
+  value an ACME key authorization is built from — and a deliberately strict parser.
+- **X.509** (RFC 5280) certificate and chain primitives: fingerprints, subject/issuer/SAN,
+  validity dates, public keys, `x5c`/PEM/DER — facts only, **never a trust ruling**.
 - **RFC 4226 / RFC 6238** HOTP and TOTP built on `hash_hmac` and a native RFC 4648 base32 codec.
 - **WebAuthn** COSE key parsing (P-256/P-384/P-521, RSA, Ed25519), a minimal defensive CBOR
   decoder, and signature verification.
@@ -37,6 +41,13 @@ is a dependency.
 | RS256 / RS384 / RS512 | `RsaKey` | RSA ≥ 2048, SHA-256/384/512 | ✅ | ✅ | |
 | ES256 / ES384 / ES512 | `EcKey` | P-256 / P-384 / P-521 | ✅ | ✅ | curve fixes the digest |
 | EdDSA | `OkpKey` | Ed25519 | ✅¹ | ✅¹ | ¹ needs `ext-sodium` |
+
+| Serialization | Type | Standard | Notes |
+|---|---|---|---|
+| JWK | `Jose\Jwk` | RFC 7517 / 7518 §6 / 8037 §2 | RSA, EC (P-256/384/521), OKP (Ed25519); public keys only |
+| JWK thumbprint | `Jose\Jwk::thumbprint()` | RFC 7638 | SHA-256 by default; the ACME key-authorization input (RFC 8555 §8.1) |
+| X.509 certificate | `X509\Certificate` | RFC 5280 / 7468 / 7515 §4.1.6 | PEM, DER, `x5c` base64; RSA + EC keys |
+| X.509 chain | `X509\Chain` | RFC 5280 §6 (path *construction* only) | `isLinked()` proves the math — **not** path validation |
 
 The `Es` signer/verifier picks its digest and coordinate size from the key's own curve, so
 there is no way to mismatch a curve against a tier. `Hs`/`Rs` take the tier as an argument
@@ -176,6 +187,79 @@ $matchedStep = $totp->verify($secret, $userCode); // int|false, timing-flat, dri
 
 Custom profiles use named/positional arguments: `new Totp(OtpAlgorithm::Sha256, digits: 8, period: 60)`.
 
+### JWK & thumbprints (`Jose\Jwk`)
+
+A JWK is a public key's JSON form (RFC 7517). `Jwk` goes **both ways**, and its RFC 7638
+thumbprint is what an ACME key authorization is built from.
+
+```php
+use RoundlyConsulting\Crypto\Jose\Jwk;
+use RoundlyConsulting\Crypto\Signature\Key\EcKey;
+
+$jwk = Jwk::fromPublicKey(EcKey::private($pem));   // a P-384 key ⇒ crv P-384, 48-byte coordinates
+
+$jwk->algorithm();          // Algorithm::ES384 — derived from kty + crv, never read from `alg`
+$jwk->thumbprint();         // base64url(sha256(canonical JSON)) — RFC 7638
+$keyAuthorization = $token.'.'.$jwk->thumbprint();          // RFC 8555 §8.1
+
+// It is JsonSerializable, so it drops straight into a JOSE protected header:
+$protected = ['alg' => $jwk->algorithm()->value, 'jwk' => $jwk, 'nonce' => $nonce, 'url' => $url];
+
+// …and back again, into a policy-checked verification key:
+$key = Jwk::fromJson($json)->publicKey();          // EcKey | RsaKey | OkpKey
+```
+
+Optional members (`kid`, `alg`, `use`) are carried in `toArray()` but **never** thumbprinted:
+`$jwk->withKid('k1')->thumbprint()` is unchanged.
+
+**Parsing is strict, on purpose.** RFC 7517 says unknown members *should* be ignored; this
+package **rejects** them, because its callers round-trip documents this fleet mints, and a
+member you silently carry is a member an attacker chose. Rejected: unknown members (`x5c`,
+`key_ops`, …), any private member (`d`, `p`, `q`, `dp`, `dq`, `qi`, `oth`, `k`), non-base64url
+values, coordinates whose length contradicts the stated `crv`, a non-minimal RSA `n`/`e`, an
+`alg` that does not match the key, a `use` other than `sig`, and documents over 16 KiB
+(members over 8 KiB are refused *before* they are decoded). Everything throws
+`MalformedJwkException`, whose message names the member and the reason.
+
+### X.509 certificates & chains (`X509\*`)
+
+```php
+use RoundlyConsulting\Crypto\Hash\HashAlgorithm;
+use RoundlyConsulting\Crypto\X509\Certificate;
+use RoundlyConsulting\Crypto\X509\Chain;
+
+$certificate = Certificate::fromPem($pem);        // also fromDer(), fromBase64() for an x5c entry
+
+$certificate->commonName();                       // 'app.example'
+$certificate->dnsNames();                         // ['app.example', '*.api.example']
+$certificate->fingerprint();                      // lower-case sha256 hex, as openssl emits it
+$certificate->notAfter();                         // CarbonImmutable
+$certificate->publicKey();                        // RsaKey | EcKey — policy-checked
+$certificate->isSignedBy($issuer);                // an ALGORITHM question
+
+// A JOSE x5c chain (leaf first), or a concatenated PEM bundle:
+$chain = Chain::fromX5c($x5c);                    // ≤ 10 certificates, strict base64, typed errors
+
+$chain->isLinked();                               // every cert is signed by the next one up
+$chain->fingerprints(HashAlgorithm::Sha1);        // leaf → root
+$chain->leaf()->publicKey();
+```
+
+Validity is reported as **dates**, with a symmetric clock-skew leeway you own:
+
+```php
+$certificate->isValidAt();                                  // now (honours Carbon::setTestNow)
+$certificate->isValidAt($token->signedAt, leewaySeconds: 60);
+$certificate->isExpiredAt(leewaySeconds: 60);              // distinct from a bad signature
+$certificate->isNotYetValidAt();                            // a negative leeway throws
+```
+
+> **Crypto proves the math; deciding what to trust is yours.** There is no `isTrusted()`, no
+> pinning, no root store, no revocation, and no hostname matching in this package — by design,
+> and enforced by an architecture test. `Chain::isLinked()` says *these certificates sign each
+> other*; it does **not** say the last one is an authority you have ever heard of. Pin your own
+> anchors, and decide for yourself what an expired certificate means.
+
 ### WebAuthn signature verification (`Cose\*`, `Signature\KeyVerifier`)
 
 ```php
@@ -234,6 +318,11 @@ Crypto::jws()->verify($token, $verifier, Algorithm::RS256);
 Crypto::hmac(HashAlgorithm::Sha256)->verify($payload, $sig, $secret);
 Crypto::totp(digits: 8)->verify($secret, $code);
 Crypto::es(EcKey::public($pem));             // keyed signers via the facade
+Crypto::jwk($key)->thumbprint();             // JWK + RFC 7638
+Crypto::jwkFromJson($json)->publicKey();
+Crypto::certificate($pem)->fingerprint();    // X.509
+Crypto::chainFromX5c($x5c)->isLinked();
+Crypto::chainFromPemBundle($bundle)->leaf();
 $t = Crypto::randomToken(40);                // codec/CSPRNG passthroughs return the value
 $b = Crypto::base64UrlEncode($bytes);
 ```
@@ -255,6 +344,26 @@ $okp    = TestKeys::ed25519();         // ephemeral Ed25519 (guard on TestKeys::
 $code = TestOtp::codeAt(time());       // a valid TOTP code for TestOtp::SECRET
 ```
 
+`TestCertificates` does the same for X.509, so no suite has to hand-roll CSRs, CA extensions,
+and an `openssl.cnf` that actually carries the sections it needs — it writes its own:
+
+```php
+use RoundlyConsulting\Crypto\Testing\TestCertificates;
+
+$ca = TestCertificates::chain();                  // leaf → intermediate → root, genuinely linked
+$ca->leafKey;                                     // the leaf's PRIVATE key — sign your test token with it
+$ca->x5c();                                       // ready to drop into a JWS `x5c` header
+$ca->pinnedFingerprints();                        // the [intermediate, root] slice a pinning verifier compares
+$ca->pemBundle();
+
+$rogue = TestCertificates::rogueLeaf($ca);        // same subject, a different CA — breaks isLinked()
+$self  = TestCertificates::selfSigned(['app.test']);
+```
+
+`ext-openssl` always stamps `notBefore` at signing time, so expired / not-yet-valid scenarios
+are produced by evaluating at another instant (`isExpiredAt($leaf->notAfter()->addDay())`, or
+under `CarbonImmutable::setTestNow()`) rather than by backdating a certificate.
+
 Optional Pest expectations are shipped as an **opt-in, non-autoloaded** file — `require` it from
 your own `tests/Pest.php` (guarded by `function_exists('expect')`, so it never loads at runtime):
 
@@ -264,6 +373,9 @@ require dirname(__DIR__).'/vendor/roundly-consulting/crypto-for-laravel/src/Test
 
 expect($token)->toBeValidJws($verifier, Algorithm::RS256);
 expect($code)->toBeValidTotp($secret);
+expect($ca->chain)->toBeLinked();                     // the math, not trust
+expect($ca->leaf())->toBeSignedBy($ca->root());
+expect($jwk)->toHaveThumbprint('NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs');
 ```
 
 ## Loading and generating keys
@@ -384,8 +496,10 @@ Everything throws a subtype of `RoundlyConsulting\Crypto\Exceptions\CryptoExcept
 catch broadly or precisely and re-wrap at your boundary — e.g.
 `Codec\InvalidEncodingException`, `Signature\InvalidSignatureException`,
 `Signature\AlgorithmMismatchException`, `Signature\WeakKeyException`,
-`Jose\MalformedTokenException`, `Cose\MalformedCborException`,
-`Cose\UnsupportedAlgorithmException`, and `Otp\InvalidOtpParameterException`.
+`Jose\MalformedTokenException`, `Jose\MalformedJwkException`, `Cose\MalformedCborException`,
+`Cose\UnsupportedAlgorithmException`, `Otp\InvalidOtpParameterException`, and — for X.509 —
+`X509\MalformedCertificateException`, `X509\InvalidChainException`, and
+`X509\InvalidLeewayException`.
 
 ## Testing
 
