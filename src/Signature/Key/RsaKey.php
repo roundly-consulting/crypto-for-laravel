@@ -203,15 +203,7 @@ final readonly class RsaKey implements PublicKey
      */
     public function publicPem(): string
     {
-        $details = openssl_pkey_get_details($this->key);
-
-        if ($details === false) {
-            OpenSsl::drainErrors();
-
-            throw KeyLoadException::unreadable('public');
-        }
-
-        return (string) $details['key'];
+        return (string) $this->details()['key'];
     }
 
     /**
@@ -233,9 +225,80 @@ final readonly class RsaKey implements PublicKey
         return OpenSsl::exportPrivatePem($this->key);
     }
 
+    /**
+     * This key's raw public modulus (`n`), big-endian and minimal — no leading
+     * zero octets, as RFC 7518 §6.3.1.1 requires.
+     *
+     * @throws KeyLoadException
+     */
+    public function modulus(): string
+    {
+        return self::minimal($this->member('n'));
+    }
+
+    /**
+     * This key's raw public exponent (`e`), big-endian and minimal — no leading
+     * zero octets, as RFC 7518 §6.3.1.2 requires.
+     *
+     * @throws KeyLoadException
+     */
+    public function exponent(): string
+    {
+        return self::minimal($this->member('e'));
+    }
+
     public function verifier(): Verifier
     {
         return new Rs($this);
+    }
+
+    /**
+     * One raw RSA public member from the key handle.
+     *
+     * @throws KeyLoadException
+     */
+    private function member(string $name): string
+    {
+        $value = $this->details()['rsa'][$name] ?? null;
+
+        if (! is_string($value) || $value === '') {
+            throw KeyLoadException::unreadable('public');
+        }
+
+        return $value;
+    }
+
+    /**
+     * The key handle's OpenSSL details — the single place this class reads raw
+     * key material, so the failure path is typed in exactly one spot.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws KeyLoadException
+     */
+    private function details(): array
+    {
+        $details = openssl_pkey_get_details($this->key);
+
+        if ($details === false) {
+            OpenSsl::drainErrors();
+
+            throw KeyLoadException::unreadable('public');
+        }
+
+        return $details;
+    }
+
+    /**
+     * The minimal big-endian encoding of a positive integer. OpenSSL already
+     * emits minimal bytes; stripping makes it a contract rather than a hope,
+     * because a non-minimal `n` would change a JWK thumbprint.
+     */
+    private static function minimal(string $bytes): string
+    {
+        $stripped = ltrim($bytes, "\x00");
+
+        return $stripped === '' ? "\x00" : $stripped;
     }
 
     /**

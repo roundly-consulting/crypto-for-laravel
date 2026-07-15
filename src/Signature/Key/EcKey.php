@@ -200,15 +200,7 @@ final readonly class EcKey implements PublicKey
      */
     public function publicPem(): string
     {
-        $details = openssl_pkey_get_details($this->key);
-
-        if ($details === false) {
-            OpenSsl::drainErrors();
-
-            throw KeyLoadException::unreadable('public');
-        }
-
-        return (string) $details['key'];
+        return (string) $this->details()['key'];
     }
 
     /**
@@ -238,9 +230,57 @@ final readonly class EcKey implements PublicKey
         return self::CURVES[$this->curve]['bytes'];
     }
 
+    /**
+     * This key's raw public point, each coordinate left-padded to THIS key's
+     * curve length — 32 bytes on P-256, 48 on P-384, 66 on P-521.
+     *
+     * The pad length is read from the key's own curve, never assumed, so a
+     * larger-curve key can never be serialized as (and thumbprinted like) a
+     * smaller one.
+     *
+     * @throws KeyLoadException
+     */
+    public function coordinates(): EcCoordinates
+    {
+        $details = $this->details();
+        $x = $details['ec']['x'] ?? null;
+        $y = $details['ec']['y'] ?? null;
+        $length = $this->coordinateBytes();
+
+        if (! is_string($x) || ! is_string($y)) {
+            throw KeyLoadException::unreadable('public');
+        }
+
+        return new EcCoordinates(
+            str_pad($x, $length, "\x00", STR_PAD_LEFT),
+            str_pad($y, $length, "\x00", STR_PAD_LEFT),
+        );
+    }
+
     public function verifier(): Verifier
     {
         return new Es($this);
+    }
+
+    /**
+     * The key handle's OpenSSL details — the single place this class reads raw
+     * key material, so the failure path is typed in exactly one spot.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws KeyLoadException
+     */
+    private function details(): array
+    {
+        $details = openssl_pkey_get_details($this->key);
+
+        if ($details === false) {
+            OpenSsl::drainErrors();
+
+            throw KeyLoadException::unreadable('public');
+        }
+
+        return $details;
     }
 
     /**
