@@ -88,3 +88,18 @@ it('reports its status through the about command', function (): void {
         ->assertOk()
         ->expectsOutputToContain('JOSE / JWS');
 });
+
+it('reveals the JWK and X.509 entry points through the facade', function (): void {
+    $fixture = RoundlyConsulting\Crypto\Testing\TestCertificates::chain();
+    $key = EcKey::generate();
+    $jwk = Crypto::jwk($key);
+
+    expect($jwk)->toBeInstanceOf(RoundlyConsulting\Crypto\Jose\Jwk::class)
+        ->and(Crypto::jwkFromArray($jwk->toArray())->thumbprint())->toBe($jwk->thumbprint())
+        ->and(Crypto::jwkFromJson((string) json_encode($jwk))->thumbprint())->toBe($jwk->thumbprint())
+        ->and(Crypto::certificate($fixture->leaf()->pem())->der())->toBe($fixture->leaf()->der())
+        ->and(Crypto::chainFromX5c($fixture->x5c())->count())->toBe(3)
+        ->and(Crypto::chainFromX5c($fixture->x5c())->isLinked())->toBeTrue()
+        ->and(Crypto::chainFromPemBundle($fixture->pemBundle())->fingerprints())
+        ->toBe($fixture->chain->fingerprints());
+});

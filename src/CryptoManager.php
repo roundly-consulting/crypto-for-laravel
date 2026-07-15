@@ -15,7 +15,9 @@ use RoundlyConsulting\Crypto\Hash\ConstantTime;
 use RoundlyConsulting\Crypto\Hash\Digest;
 use RoundlyConsulting\Crypto\Hash\HashAlgorithm;
 use RoundlyConsulting\Crypto\Hash\Hmac;
+use RoundlyConsulting\Crypto\Jose\Jwk;
 use RoundlyConsulting\Crypto\Jose\Jws;
+use RoundlyConsulting\Crypto\Jose\MalformedJwkException;
 use RoundlyConsulting\Crypto\Otp\Hotp;
 use RoundlyConsulting\Crypto\Otp\OtpAlgorithm;
 use RoundlyConsulting\Crypto\Otp\ProvisioningUri;
@@ -32,8 +34,13 @@ use RoundlyConsulting\Crypto\Signature\Key\HmacSecret;
 use RoundlyConsulting\Crypto\Signature\Key\OkpKey;
 use RoundlyConsulting\Crypto\Signature\Key\PublicKey;
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
+use RoundlyConsulting\Crypto\Signature\KeyLoadException;
 use RoundlyConsulting\Crypto\Signature\KeyVerifier;
 use RoundlyConsulting\Crypto\Signature\Rs;
+use RoundlyConsulting\Crypto\X509\Certificate;
+use RoundlyConsulting\Crypto\X509\Chain;
+use RoundlyConsulting\Crypto\X509\InvalidChainException;
+use RoundlyConsulting\Crypto\X509\MalformedCertificateException;
 use SensitiveParameter;
 
 /**
@@ -53,6 +60,72 @@ final class CryptoManager
     public function jws(): Jws
     {
         return new Jws;
+    }
+
+    // ── JWK (RFC 7517 / RFC 7638) ───────────────────────────────────────────
+
+    /**
+     * Serialize a public key as a JWK — the curve and coordinate padding come
+     * from the key itself.
+     *
+     * @throws MalformedJwkException|KeyLoadException
+     */
+    public function jwk(PublicKey $key): Jwk
+    {
+        return Jwk::fromPublicKey($key);
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $members
+     *
+     * @throws MalformedJwkException
+     */
+    public function jwkFromArray(array $members): Jwk
+    {
+        return Jwk::fromArray($members);
+    }
+
+    /**
+     * @throws MalformedJwkException
+     */
+    public function jwkFromJson(string $json): Jwk
+    {
+        return Jwk::fromJson($json);
+    }
+
+    // ── X.509 (RFC 5280) ────────────────────────────────────────────────────
+
+    /**
+     * Parse a PEM certificate. Every accessor on the result is a FACT — crypto
+     * reports what a certificate says, it never rules on whether to trust it.
+     *
+     * @throws MalformedCertificateException
+     */
+    public function certificate(string $pem): Certificate
+    {
+        return Certificate::fromPem($pem);
+    }
+
+    /**
+     * A chain from a JOSE `x5c` header: standard base64 DER, leaf first.
+     *
+     * @param  list<string>  $x5c
+     *
+     * @throws MalformedCertificateException|InvalidChainException
+     */
+    public function chainFromX5c(array $x5c): Chain
+    {
+        return Chain::fromX5c($x5c);
+    }
+
+    /**
+     * A chain from a concatenated PEM bundle (leaf + chain).
+     *
+     * @throws MalformedCertificateException|InvalidChainException
+     */
+    public function chainFromPemBundle(string $bundle): Chain
+    {
+        return Chain::fromPemBundle($bundle);
     }
 
     // ── Hashing ─────────────────────────────────────────────────────────────

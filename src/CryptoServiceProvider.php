@@ -34,6 +34,7 @@ final class CryptoServiceProvider extends ServiceProvider
         if (class_exists(AboutCommand::class)) {
             AboutCommand::add('Crypto', [
                 'JOSE / JWS' => 'enabled',
+                'JWK / X.509' => 'enabled',
                 'EdDSA (Ed25519)' => function_exists('sodium_crypto_sign_verify_detached') ? 'available' : 'needs ext-sodium',
             ]);
         }

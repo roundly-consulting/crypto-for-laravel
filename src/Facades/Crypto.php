@@ -9,6 +9,12 @@ use RoundlyConsulting\Crypto\CryptoManager;
 
 /**
  * @method static \RoundlyConsulting\Crypto\Jose\Jws jws()
+ * @method static \RoundlyConsulting\Crypto\Jose\Jwk jwk(\RoundlyConsulting\Crypto\Signature\Key\PublicKey $key)
+ * @method static \RoundlyConsulting\Crypto\Jose\Jwk jwkFromArray(array<array-key, mixed> $members)
+ * @method static \RoundlyConsulting\Crypto\Jose\Jwk jwkFromJson(string $json)
+ * @method static \RoundlyConsulting\Crypto\X509\Certificate certificate(string $pem)
+ * @method static \RoundlyConsulting\Crypto\X509\Chain chainFromX5c(list<string> $x5c)
+ * @method static \RoundlyConsulting\Crypto\X509\Chain chainFromPemBundle(string $bundle)
  * @method static \RoundlyConsulting\Crypto\Hash\Hmac hmac(\RoundlyConsulting\Crypto\Hash\HashAlgorithm $algorithm = \RoundlyConsulting\Crypto\Hash\HashAlgorithm::Sha256)
  * @method static \RoundlyConsulting\Crypto\Hash\Digest digest(\RoundlyConsulting\Crypto\Hash\HashAlgorithm $algorithm = \RoundlyConsulting\Crypto\Hash\HashAlgorithm::Sha256)
  * @method static bool constantTimeEquals(string $known, string $user)
