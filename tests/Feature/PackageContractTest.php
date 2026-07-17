@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migrator;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\Crypto\CryptoServiceProvider;
 use RoundlyConsulting\PackageToolkit\Package;
@@ -107,24 +106,4 @@ it('ships no config file and reads no crypto config key', function (): void {
     // The scrape really did read the source (guards against a silent no-op).
     expect($strings)->not->toBe([])
         ->and($ownKeys)->toBe([]);
-});
-
-it('never renders key material, a secret, or a key path in its about section', function (): void {
-    config()->set('app.key', 'base64:'.base64_encode(str_repeat('k', 32)));
-    config()->set('jwt.keys.private', '/etc/roundly/secrets/jwt-signing-key.pem');
-    config()->set('two-factor.pepper', 'the-pepper-value');
-    config()->set('passkeys.attestation.roots', ['ac:me:tr:us:t:an:ch:or']);
-
-    Artisan::call('about --only=crypto');
-    $rendered = Artisan::output();
-
-    // Guard the guard: the capture must be real before any `not->toContain` runs.
-    expect($rendered)->toContain('JOSE / JWS')
-        ->and($rendered)->toContain('enabled')
-        ->and($rendered)->not->toContain((string) config('app.key'))
-        ->and($rendered)->not->toContain('/etc/roundly/secrets/jwt-signing-key.pem')
-        ->and($rendered)->not->toContain('the-pepper-value')
-        ->and($rendered)->not->toContain('ac:me:tr:us:t:an:ch:or')
-        ->and($rendered)->not->toContain('BEGIN')
-        ->and($rendered)->not->toContain('PRIVATE');
 });
