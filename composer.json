@@ -35,6 +35,18 @@
             "type": "vcs",
             "url": "https://github.com/roundly-consulting/package-toolkit-for-laravel",
             "no-api": true
+        },
+        {
+            "type": "path",
+            "url": "../testing-for-laravel*",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/roundly-consulting/testing-for-laravel",
+            "no-api": true
         }
     ],
     "require": {
@@ -55,7 +67,8 @@
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-arch": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.0",
-        "phpstan/phpstan-deprecation-rules": "^2.0"
+        "phpstan/phpstan-deprecation-rules": "^2.0",
+        "roundly-consulting/testing-for-laravel": "@dev"
     },
     "suggest": {
         "ext-sodium": "Required for Ed25519 (EdDSA) signature verification; ships enabled by default on modern PHP."
