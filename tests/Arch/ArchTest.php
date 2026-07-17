@@ -13,12 +13,28 @@ use RoundlyConsulting\Testing\Arch\ArchPresets;
 ArchPresets::strictTypes('RoundlyConsulting\Crypto');
 
 /**
- * Two exemptions, both deliberate extension points: CryptoException, the abstract base
- * every crypto error extends so a host can catch them uniformly, and ClaimMismatchException,
- * which the JOSE layer's more specific claim errors extend.
+ * ONE exemption: ClaimMismatchException, which the JOSE layer's more specific claim errors
+ * extend. It is concrete, so `final` on it would be a real breaking change to that hierarchy.
+ *
+ * `CryptoException::class` is GONE from this list, and its removal is a small finding rather
+ * than tidying. It is **abstract**, and `finalByDefault` skips abstract classes on its own
+ * (`abstract final` is a PHP fatal, so flagging one was a false positive by construction) —
+ * so the entry silenced nothing it needed to. The rot-check cannot catch this class of dead
+ * weight either: the class exists, so the entry looks live. It was found by asking what each
+ * exemption still buys, which is the same audit metrics ran when it dropped seven abstract
+ * bases.
+ *
+ * The list moved to the `$ignoring` PARAMETER, which buys the two things Pest's fluent
+ * `->ignoring()` cannot: rot-checking, and recovery of the prefix SHADOW (Pest matches
+ * exemptions by string prefix, not class identity — pest-plugin-arch Blueprint.php:103).
+ * Measured across all 69 concrete classes here: this list shadows **nothing**. The package
+ * holds exactly one latent prefix pair — `Codec\Base64` over `Codec\Base64Url` — and both
+ * are final, so the guard is prospective: it fires the day Base64 is exempted and Base64Url
+ * is opened.
  */
-ArchPresets::finalByDefault('RoundlyConsulting\Crypto')
-    ->ignoring([CryptoException::class, ClaimMismatchException::class]);
+ArchPresets::finalByDefault('RoundlyConsulting\Crypto', [
+    ClaimMismatchException::class,
+]);
 
 /**
  * `noLocalCryptoPrimitives` — and this package is the reason the preset exists.
@@ -39,8 +55,6 @@ ArchPresets::finalByDefault('RoundlyConsulting\Crypto')
  *   - Otp\         — Hotp, OtpAlgorithm (RFC 4226 is defined in terms of HMAC)
  *   - X509\        — Certificate, OpenSslX509 (certificate parsing is openssl)
  *   - Testing\     — TestCertificates, a fixture generator
- *   - CryptoServiceProvider — probes `function_exists('sodium_crypto_sign_verify_detached')`
- *     to report EdDSA availability in `about`; a capability probe, not a use.
  *
  * NOT exempted, and this is the point: Jose\, Cose\, Asn1\, CryptoManager and Facades\.
  * They are protocol/decoding layers, and every one of them is primitive-free today —
@@ -49,18 +63,34 @@ ArchPresets::finalByDefault('RoundlyConsulting\Crypto')
  * red. So this guards the real regression — a protocol layer reaching past the primitive
  * layer for convenience, which is how the constant-time and algorithm-confusion guarantees
  * in Hash\ and Signature\ get silently bypassed.
+ *
+ * ## CryptoServiceProvider is no longer exempt, and never needed to be
+ *
+ * It was exempted for `function_exists('sodium_crypto_sign_verify_detached')` — a capability
+ * probe reported in `about`, argued (correctly) to be a mention rather than a use. The
+ * argument was sound and the exemption was still pointless: the primitive's name appears
+ * there only as a **string literal**, and Pest's arch layer resolves symbol usage, not
+ * string contents, so the ban never saw it. The exemption silenced a violation that did not
+ * exist — which the rot-check cannot detect, since the class is real.
+ *
+ * The cost was not zero. An exemption is scoped to a CLASS, not a function, so this one
+ * blinded the provider to all 19 primitives to excuse a probe that was never flagged.
+ * Measured both ways before removing: with a real `random_bytes()` call injected into
+ * `register()`, the preset is GREEN with the exemption and RED without it. The provider is
+ * wiring — not a primitive layer — so the ban belongs on it, and now holds it.
+ *
+ * The layer boundary above is unchanged: the seven primitive namespaces stay exempt because
+ * implementing primitives is their job.
  */
-ArchPresets::noLocalCryptoPrimitives('RoundlyConsulting\Crypto')
-    ->ignoring([
-        'RoundlyConsulting\Crypto\Hash',
-        'RoundlyConsulting\Crypto\Signature',
-        'RoundlyConsulting\Crypto\Codec',
-        'RoundlyConsulting\Crypto\Random',
-        'RoundlyConsulting\Crypto\Otp',
-        'RoundlyConsulting\Crypto\X509',
-        'RoundlyConsulting\Crypto\Testing',
-        'RoundlyConsulting\Crypto\CryptoServiceProvider',
-    ]);
+ArchPresets::noLocalCryptoPrimitives('RoundlyConsulting\Crypto', [
+    'RoundlyConsulting\Crypto\Hash',
+    'RoundlyConsulting\Crypto\Signature',
+    'RoundlyConsulting\Crypto\Codec',
+    'RoundlyConsulting\Crypto\Random',
+    'RoundlyConsulting\Crypto\Otp',
+    'RoundlyConsulting\Crypto\X509',
+    'RoundlyConsulting\Crypto\Testing',
+]);
 
 /**
  * The Dependency Policy as a test — replaces the hand-rolled loop in
