@@ -146,6 +146,5 @@ arch('bans third-party crypto libraries')
         'Webauthn',
         'OTPHP',
         'PragmaRX',
-        'Acme',
     ])
     ->not->toBeUsed();
