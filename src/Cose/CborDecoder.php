@@ -99,14 +99,17 @@ final class CborDecoder
         };
 
         $chunk = $this->readBytes($bytes, $offset, $count);
+
+        // An eight-byte argument with its top bit set does not fit a PHP int — shifting it
+        // in would wrap negative.
+        if ($count === 8 && ord($chunk[0]) >= 0x80) {
+            throw MalformedCborException::make('length exceeds supported range');
+        }
+
         $value = 0;
 
         foreach (str_split($chunk) as $byte) {
             $value = ($value << 8) | ord($byte);
-        }
-
-        if ($value < 0) {
-            throw MalformedCborException::make('length exceeds supported range');
         }
 
         // CTAP2 canonical CBOR requires the shortest encoding: a value that fits

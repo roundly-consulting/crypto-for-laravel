@@ -223,16 +223,16 @@ final class DerDecoder
             throw MalformedDerException::nonMinimalLength();
         }
 
+        // An eight-octet length with its top bit set does not fit a PHP int — shifting it
+        // in would wrap negative. It is astronomically past the input cap either way.
+        if ($count === 8 && ord($chunk[0]) >= 0x80) {
+            throw MalformedDerException::tooLarge(PHP_INT_MAX, self::MAX_INPUT_BYTES);
+        }
+
         $length = 0;
 
         for ($i = 0; $i < $count; $i++) {
             $length = ($length << 8) | ord($chunk[$i]);
-        }
-
-        // A negative value means the eight-byte length overflowed a PHP int; it is
-        // astronomically past the input cap either way.
-        if ($length < 0) {
-            throw MalformedDerException::tooLarge(PHP_INT_MAX, self::MAX_INPUT_BYTES);
         }
 
         // The short form covers everything under 0x80, so the long form here is
