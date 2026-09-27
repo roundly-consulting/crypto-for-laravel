@@ -1,8 +1,10 @@
+<!-- roundly-hero:start -->
 <p align="center">
-  <a href="https://roundly-consulting.com/open-source">
-    <img src="art/hero.png" alt="Crypto For Laravel — Roundly open source" width="100%">
+  <a href="https://roundly-consulting.com/open-source/docs/crypto-for-laravel?utm_source=github&utm_medium=readme&utm_campaign=open-source&utm_content=crypto-for-laravel">
+    <img src="art/hero.png" alt="Cryptographic Primitives for Laravel — Roundly open source" width="100%">
   </a>
 </p>
+<!-- roundly-hero:end -->
 
 # Cryptographic Primitives for Laravel
 
