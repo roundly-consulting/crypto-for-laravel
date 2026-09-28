@@ -10,14 +10,26 @@ use RoundlyConsulting\Crypto\Signature\Key\PublicKey;
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
 
 /**
- * Turns a decoded COSE_Key map into a verifiable {@see PublicKey}.
+ * Turns COSE_Key bytes into a verifiable {@see PublicKey}.
  *
  * COSE_Key labels (RFC 9052 / RFC 9053): 1 = kty, 3 = alg, -1 = crv (EC/OKP) or
  * n (RSA), -2 = x or e (RSA), -3 = y. kty: 1 = OKP, 2 = EC2, 3 = RSA.
  * crv: 1 = P-256, 2 = P-384, 3 = P-521, 6 = Ed25519.
+ *
+ * It reads the BYTES, not an already-decoded array: a PHP string cannot say
+ * whether CBOR carried it as a byte string or a text string, and a key material
+ * field (x, y, n, e) must be a byte string — a strict COSE implementation
+ * rejects a text-typed coordinate, so this one does too.
  */
 final class CoseKey
 {
+    /** CBOR major types a COSE_Key field may carry. */
+    private const int UNSIGNED = 0;
+
+    private const int NEGATIVE = 1;
+
+    private const int BYTE_STRING = 2;
+
     /**
      * COSE EC2 curve label → [our curve label, the ES* algorithm it requires].
      *
@@ -30,12 +42,11 @@ final class CoseKey
     ];
 
     /**
-     * @param  array<int|string, mixed>  $cose
-     *
      * @throws MalformedCborException|UnsupportedAlgorithmException
      */
-    public static function fromDecoded(array $cose): PublicKey
+    public static function fromCbor(string $bytes): PublicKey
     {
+        $cose = (new CborDecoder)->decodeMapWithTypes($bytes);
         $kty = self::int($cose, 1, 'kty');
         $algorithm = self::algorithm($cose);
 
@@ -48,7 +59,7 @@ final class CoseKey
     }
 
     /**
-     * @param  array<int|string, mixed>  $cose
+     * @param  array<int|string, array{int, mixed}>  $cose
      */
     private static function ec2(array $cose, CoseAlgorithm $algorithm): EcKey
     {
@@ -69,7 +80,7 @@ final class CoseKey
     }
 
     /**
-     * @param  array<int|string, mixed>  $cose
+     * @param  array<int|string, array{int, mixed}>  $cose
      */
     private static function rsa(array $cose, CoseAlgorithm $algorithm): RsaKey
     {
@@ -84,7 +95,7 @@ final class CoseKey
     }
 
     /**
-     * @param  array<int|string, mixed>  $cose
+     * @param  array<int|string, array{int, mixed}>  $cose
      */
     private static function okp(array $cose, CoseAlgorithm $algorithm): OkpKey
     {
@@ -102,7 +113,7 @@ final class CoseKey
     }
 
     /**
-     * @param  array<int|string, mixed>  $cose
+     * @param  array<int|string, array{int, mixed}>  $cose
      */
     private static function algorithm(array $cose): CoseAlgorithm
     {
@@ -112,13 +123,13 @@ final class CoseKey
     }
 
     /**
-     * @param  array<int|string, mixed>  $cose
+     * @param  array<int|string, array{int, mixed}>  $cose
      */
     private static function int(array $cose, int $label, string $name): int
     {
-        $value = $cose[$label] ?? null;
+        [$type, $value] = $cose[$label] ?? [null, null];
 
-        if (! is_int($value)) {
+        if (($type !== self::UNSIGNED && $type !== self::NEGATIVE) || ! is_int($value)) {
             throw MalformedCborException::make("missing or non-integer {$name}");
         }
 
@@ -126,13 +137,13 @@ final class CoseKey
     }
 
     /**
-     * @param  array<int|string, mixed>  $cose
+     * @param  array<int|string, array{int, mixed}>  $cose
      */
     private static function bytes(array $cose, int $label, string $name): string
     {
-        $value = $cose[$label] ?? null;
+        [$type, $value] = $cose[$label] ?? [null, null];
 
-        if (! is_string($value) || $value === '') {
+        if ($type !== self::BYTE_STRING || ! is_string($value) || $value === '') {
             throw MalformedCborException::make("missing or non-binary {$name}");
         }
 

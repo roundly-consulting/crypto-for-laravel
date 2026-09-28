@@ -61,6 +61,26 @@ it('accepts a distinct-key map but rejects a repeated one', function (): void {
     (new CborDecoder)->decode(hex2bin('a2010101'.'02'));
 })->throws(MalformedCborException::class, 'duplicate map key');
 
+it('never turns a numeric-looking text key into an integer key', function (string $hex): void {
+    // PHP stores the array key "1" as the integer 1, so a text label would be
+    // indistinguishable from the COSE integer label it imitates.
+    (new CborDecoder)->decode(hex2bin($hex));
+})->throws(MalformedCborException::class, 'text map key')->with([
+    '{"1": 2}' => ['a1613102'],
+    '{"-1": 2}' => ['a1622d3102'],
+    '{"3": -7}' => ['a1613326'],
+]);
+
+it('keeps a text key PHP leaves as a string', function (): void {
+    // "01" and "-0" are not canonical integers, so PHP keeps them as strings.
+    expect((new CborDecoder)->decode(hex2bin('a362303101622d3002616103')))
+        ->toBe(['01' => 1, '-0' => 2, 'a' => 3]);
+});
+
+it('rejects a text string that is not UTF-8', function (): void {
+    (new CborDecoder)->decode(hex2bin('62c328'));
+})->throws(MalformedCborException::class, 'UTF-8');
+
 it('rejects nesting deeper than the depth cap', function (): void {
     // 17 levels of single-element arrays (0x81) exceeds MAX_DEPTH (16).
     $bytes = str_repeat("\x81", CborDecoder::MAX_DEPTH + 1)."\x00";

@@ -239,11 +239,12 @@ final class CryptoManager
     }
 
     /**
-     * @param  array<int|string, mixed>  $cose
+     * A verifiable public key from COSE_Key BYTES (the stored credential key,
+     * or `authenticatorData($bytes)->coseKeyBytes`).
      */
-    public function coseKey(array $cose): PublicKey
+    public function coseKey(string $cose): PublicKey
     {
-        return CoseKey::fromDecoded($cose);
+        return CoseKey::fromCbor($cose);
     }
 
     public function authenticatorData(string $bytes): AuthenticatorData

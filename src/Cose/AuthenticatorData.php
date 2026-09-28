@@ -109,7 +109,7 @@ final readonly class AuthenticatorData
             signCount: $signCount,
             aaguid: $aaguid,
             credentialId: $credentialId,
-            coseKey: CoseKey::fromDecoded($result->value),
+            coseKey: CoseKey::fromCbor($coseKeyBytes),
             coseKeyBytes: $coseKeyBytes,
         );
     }

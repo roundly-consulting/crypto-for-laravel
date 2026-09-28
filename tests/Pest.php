@@ -49,16 +49,35 @@ function jsonFixture(string $path): array
 }
 
 /**
- * The decoded COSE_Key map for a committed vector (es256 / rs256 / eddsa).
- *
- * @return array<int|string, mixed>
+ * The COSE_Key bytes of a committed vector (es256 / rs256 / eddsa).
  */
-function coseMap(string $name): array
+function coseBytes(string $name): string
 {
     /** @var array{cose: string} $vector */
     $vector = cryptoVectors()[$name];
-    $decoded = (new RoundlyConsulting\Crypto\Cose\CborDecoder)->decode(hex2bin($vector['cose']));
 
-    /** @var array<int|string, mixed> */
-    return $decoded;
+    return (string) hex2bin($vector['cose']);
+}
+
+/**
+ * Encode a COSE_Key-shaped CBOR map: integer labels, integer or BYTE-string values.
+ *
+ * @param  array<int, int|string>  $map
+ */
+function coseCbor(array $map): string
+{
+    $head = static fn (int $major, int $argument): string => match (true) {
+        $argument < 24 => chr($major << 5 | $argument),
+        $argument < 0x100 => chr($major << 5 | 24).chr($argument),
+        default => chr($major << 5 | 25).pack('n', $argument),
+    };
+    $integer = static fn (int $value): string => $value >= 0 ? $head(0, $value) : $head(1, -1 - $value);
+
+    $bytes = $head(5, count($map));
+
+    foreach ($map as $label => $value) {
+        $bytes .= $integer($label).(is_int($value) ? $integer($value) : $head(2, strlen($value)).$value);
+    }
+
+    return $bytes;
 }

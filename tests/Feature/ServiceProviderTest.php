@@ -78,7 +78,7 @@ it('surfaces codecs, CSPRNG, and hashing through the facade', function (): void 
 
 it('surfaces COSE and OTP discovery helpers through the facade', function (): void {
     $es256 = cryptoVectors()['es256'];
-    $key = Crypto::coseKey(Crypto::cbor()->decode(hex2bin($es256['cose'])));
+    $key = Crypto::coseKey(hex2bin($es256['cose']));
     $authData = Crypto::authenticatorData(hex2bin(cryptoVectors()['auth_data']['bytes']));
     $uri = Crypto::provisioningUri('JBSWY3DPEHPK3PXP', 'alice', 'Acme');
 

@@ -34,7 +34,7 @@ use RoundlyConsulting\Crypto\CryptoManager;
  * @method static \RoundlyConsulting\Crypto\Signature\Key\Keys keys()
  * @method static \RoundlyConsulting\Crypto\Signature\Ec\DerCodec ecDer()
  * @method static \RoundlyConsulting\Crypto\Cose\CborDecoder cbor()
- * @method static \RoundlyConsulting\Crypto\Signature\Key\PublicKey coseKey(array<int|string, mixed> $cose)
+ * @method static \RoundlyConsulting\Crypto\Signature\Key\PublicKey coseKey(string $cose)
  * @method static \RoundlyConsulting\Crypto\Cose\AuthenticatorData authenticatorData(string $bytes)
  * @method static \RoundlyConsulting\Crypto\Otp\Totp totp(\RoundlyConsulting\Crypto\Otp\OtpAlgorithm $algorithm = \RoundlyConsulting\Crypto\Otp\OtpAlgorithm::Sha1, int $digits = 6, int $period = 30)
  * @method static \RoundlyConsulting\Crypto\Otp\Hotp hotp(\RoundlyConsulting\Crypto\Otp\OtpAlgorithm $algorithm = \RoundlyConsulting\Crypto\Otp\OtpAlgorithm::Sha1, int $digits = 6)

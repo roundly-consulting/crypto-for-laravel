@@ -145,7 +145,7 @@ Crypto::totp(digits: 8)->verify($otpSecret, $code);
 Crypto::jwk($ec)->thumbprint();
 Crypto::x509()->fromPem($pem)->fingerprint();
 Crypto::x509()->chain()->fromX5c($x5c)->isLinked();      // the math — the trust call stays yours
-Crypto::coseKey(Crypto::cbor()->decode($coseBytes));
+Crypto::coseKey($coseBytes);                             // COSE_Key bytes -> a public key
 
 // Randomness and codecs return the value directly
 $code   = Crypto::random()->numeric(6);
@@ -165,7 +165,7 @@ Every method, by area:
 | X.509 | `x509()`: `fromPem()`, `fromDer()`, `fromBase64()`, `chain()` → `fromX5c()`, `fromPems()`, `fromPemBundle()`, `fromCertificates()`; shortcuts `certificate($pem)`, `chainFromX5c($x5c)`, `chainFromPemBundle($bundle)` |
 | ASN.1 / DER | `derDecoder()` |
 | Hashing | `hmac($alg)`, `digest($alg)`, `constantTimeEquals($known, $user)` |
-| COSE / WebAuthn | `cbor()`, `coseKey($decoded)`, `authenticatorData($bytes)` |
+| COSE / WebAuthn | `cbor()`, `coseKey($coseBytes)`, `authenticatorData($bytes)` |
 | OTP | `totp($alg, $digits, $period)`, `hotp($alg, $digits)`, `provisioningUri($secret, $label, $issuer, …)` |
 | CSPRNG | `random()`: `bytes()`, `token()`, `numeric()`, `alphanumeric()`, `fromAlphabet()`, `secret()`; shortcuts `randomBytes()`, `randomToken()`, `randomSecret()` |
 | Codecs | `base64UrlEncode/Decode()`, `base64Encode/Decode()`, `base32Encode/Decode()`, `hexEncode/Decode()` |
@@ -413,14 +413,19 @@ rather than the stack.
 ```php
 use RoundlyConsulting\Crypto\Cose\AuthenticatorData;
 use RoundlyConsulting\Crypto\Cose\CoseKey;
-use RoundlyConsulting\Crypto\Cose\CborDecoder;
 use RoundlyConsulting\Crypto\Signature\KeyVerifier;
 
 $authData = AuthenticatorData::parse($rawAuthenticatorData);      // rpIdHash, flags, signCount, COSE key
-$key = CoseKey::fromDecoded((new CborDecoder)->decode($coseBytes)); // -> a verifiable public key
+$key = CoseKey::fromCbor($coseBytes);                             // COSE_Key bytes -> a verifiable public key
 
 $ok = (new KeyVerifier)->verify($key, $signedData, $signature);   // ES256 DER or raw, RS256, EdDSA
 ```
+
+`CoseKey::fromCbor()` takes the COSE_Key **bytes** (a stored credential key, or
+`$authData->coseKeyBytes`), not a decoded array: a PHP string cannot say whether CBOR carried it as
+a byte string or a text string, and a strict COSE reader refuses a text-typed `x`/`y`/`n`/`e`. The
+`CborDecoder` itself refuses a text string that is not UTF-8 and a text map key PHP would store as
+an integer (`"1"`, `"-1"`), so a text label can never pass for the integer label it imitates.
 
 The ceremony (challenge binding, origin, rpId hash, flag policy, sign-count reconciliation)
 stays in your relying-party code; this package only decodes bytes and checks signatures.
