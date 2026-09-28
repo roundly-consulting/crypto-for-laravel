@@ -536,9 +536,11 @@ class adds opt-in **Laravel-native loaders** that read the material from a files
 from your own config key, plus **generators** so you never have to hand-roll a CSPRNG.
 
 Every loader validates with the exact same guards as the core factory (HMAC ≥ 32 random
-bytes and PEM-reject, RSA ≥ 2048, EC curve checks, Ed25519 length), and a missing file or
-missing/empty/non-string config value throws a typed `Signature\KeyLoadException` — never a
-PHP warning.
+bytes and PEM-reject, RSA ≥ 2048, EC curve checks, Ed25519 length), and a missing file (whether
+the disk returns `null` or is configured with `'throw' => true`), an unknown disk name, a
+failed write in `fromStorageOrGenerate()`, or a missing/empty/non-string config value throws a
+typed `Signature\KeyLoadException` — never a PHP warning, and never a filesystem exception
+(the original stays on `getPrevious()`).
 
 The PEM factories — `RsaKey`/`EcKey` `public()`/`private()`, `Certificate::fromPem()`,
 `Chain::fromPems()` — take PEM **text**, never a path: a `file://…` string (which PHP's OpenSSL

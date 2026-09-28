@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Crypto\Signature;
 
 use RoundlyConsulting\Crypto\Exceptions\CryptoException;
+use Throwable;
 
 /**
  * Thrown when OpenSSL cannot load, parse, or generate a key, or a loaded key is
@@ -27,9 +28,19 @@ final class KeyLoadException extends CryptoException
         return new self("The EC curve [{$curve}] is not supported.");
     }
 
-    public static function missingFile(string $disk, string $path): self
+    public static function missingFile(string $disk, string $path, ?Throwable $previous = null): self
     {
-        return new self("No key material was found on disk [{$disk}] at [{$path}].");
+        return new self("No key material was found on disk [{$disk}] at [{$path}].", previous: $previous);
+    }
+
+    public static function unknownDisk(string $disk, Throwable $previous): self
+    {
+        return new self("The filesystem disk [{$disk}] is not configured.", previous: $previous);
+    }
+
+    public static function unwritable(string $disk, string $path, ?Throwable $previous = null): self
+    {
+        return new self("Generated key material could not be written to disk [{$disk}] at [{$path}].", previous: $previous);
     }
 
     public static function missingConfig(string $key): self

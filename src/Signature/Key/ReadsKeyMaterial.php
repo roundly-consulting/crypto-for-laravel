@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Crypto\Signature\Key;
 
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
+use InvalidArgumentException;
 use RoundlyConsulting\Crypto\Signature\KeyLoadException;
+use RuntimeException;
 use SensitiveParameter;
 
 /**
@@ -22,13 +25,21 @@ use SensitiveParameter;
 trait ReadsKeyMaterial
 {
     /**
-     * Read raw key material off a filesystem disk, or fail with a typed error.
+     * Read raw key material off a filesystem disk, or fail with a typed error —
+     * whether the disk returns null for a missing file (the default) or throws
+     * (a disk configured with `'throw' => true`), and for an unknown disk name.
      *
-     * @throws KeyLoadException when the file is missing or the disk is unreadable
+     * @throws KeyLoadException when the file is missing or the disk is unreadable or unknown
      */
     protected static function readFromStorage(string $disk, string $path): string
     {
-        $contents = Storage::disk($disk)->get($path);
+        $filesystem = self::disk($disk);
+
+        try {
+            $contents = $filesystem->get($path);
+        } catch (RuntimeException $e) {
+            throw KeyLoadException::missingFile($disk, $path, $e);
+        }
 
         if ($contents === null) {
             throw KeyLoadException::missingFile($disk, $path);
@@ -52,9 +63,12 @@ trait ReadsKeyMaterial
         return $value;
     }
 
+    /**
+     * @throws KeyLoadException when the disk is unknown
+     */
     protected static function storageHas(string $disk, string $path): bool
     {
-        return Storage::disk($disk)->exists($path);
+        return self::disk($disk)->exists($path);
     }
 
     /**
@@ -66,10 +80,38 @@ trait ReadsKeyMaterial
      * stores) it is a coarser ACL or a no-op. Only persist secret key material to
      * a disk you control that is private and local-permission-capable — never a
      * world-readable or publicly-served disk.
+     *
+     * A write that fails is an error, never a shrug: a generated key that was
+     * not persisted would be replaced by a DIFFERENT one on the next boot, and
+     * everything signed with this one would stop verifying.
+     *
+     * @throws KeyLoadException when the disk is unknown or the write fails
      */
-    protected static function persistPrivate(string $disk, string $path, string $contents): void
+    protected static function persistPrivate(string $disk, string $path, #[SensitiveParameter] string $contents): void
     {
-        Storage::disk($disk)->put($path, $contents, 'private');
+        $filesystem = self::disk($disk);
+
+        try {
+            $written = $filesystem->put($path, $contents, 'private');
+        } catch (RuntimeException $e) {
+            throw KeyLoadException::unwritable($disk, $path, $e);
+        }
+
+        if ($written === false) {
+            throw KeyLoadException::unwritable($disk, $path);
+        }
+    }
+
+    /**
+     * @throws KeyLoadException when no disk of that name is configured
+     */
+    private static function disk(string $disk): Filesystem
+    {
+        try {
+            return Storage::disk($disk);
+        } catch (InvalidArgumentException $e) {
+            throw KeyLoadException::unknownDisk($disk, $e);
+        }
     }
 
     /**

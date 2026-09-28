@@ -289,3 +289,47 @@ describe('OkpKey::fromStorageOrGenerate', function () use ($sodium): void {
         expect(Storage::disk('keys')->get('okp.key'))->toBe('short');
     })->skip(fn (): bool => ! $sodium(), 'ext-sodium not loaded');
 });
+
+// ── storage failures stay typed ─────────────────────────────────────────────
+
+describe('storage failures', function (): void {
+    it('reports a missing file on a throwing disk as a KeyLoadException', function (): void {
+        config(['filesystems.disks.strict' => [
+            'driver' => 'local',
+            'root' => sys_get_temp_dir().'/crypto-strict-'.bin2hex(random_bytes(4)),
+            'throw' => true,
+        ]]);
+
+        expect(fn (): mixed => HmacSecret::fromStorage('strict', 'missing.key'))
+            ->toThrow(KeyLoadException::class, 'No key material was found on disk [strict] at [missing.key]')
+            ->and(fn (): mixed => RsaKey::privateFromStorage('strict', 'missing.pem'))
+            ->toThrow(KeyLoadException::class, 'No key material was found');
+    });
+
+    it('reports an unknown disk as a KeyLoadException', function (): void {
+        expect(fn (): mixed => HmacSecret::fromStorage('no-such-disk', 'hmac.key'))
+            ->toThrow(KeyLoadException::class, 'disk [no-such-disk]')
+            ->and(fn (): mixed => EcKey::fromStorageOrGenerate('no-such-disk', 'ec.pem'))
+            ->toThrow(KeyLoadException::class, 'disk [no-such-disk]');
+    });
+
+    it('refuses to hand out a generated key the disk would not persist', function (): void {
+        $disk = Mockery::mock(Illuminate\Contracts\Filesystem\Filesystem::class);
+        $disk->shouldReceive('exists')->andReturn(false);
+        $disk->shouldReceive('put')->andReturn(false);
+        Storage::shouldReceive('disk')->with('readonly')->andReturn($disk);
+
+        // Otherwise the next boot would mint a DIFFERENT key and every token
+        // signed with this one would stop verifying.
+        HmacSecret::fromStorageOrGenerate('readonly', 'hmac.key');
+    })->throws(KeyLoadException::class, 'could not be written to disk [readonly] at [hmac.key]');
+
+    it('reports a throwing write as a KeyLoadException', function (): void {
+        $disk = Mockery::mock(Illuminate\Contracts\Filesystem\Filesystem::class);
+        $disk->shouldReceive('exists')->andReturn(false);
+        $disk->shouldReceive('put')->andThrow(League\Flysystem\UnableToWriteFile::atLocation('hmac.key', 'read-only'));
+        Storage::shouldReceive('disk')->with('readonly')->andReturn($disk);
+
+        HmacSecret::fromStorageOrGenerate('readonly', 'hmac.key');
+    })->throws(KeyLoadException::class, 'could not be written');
+});
