@@ -325,6 +325,11 @@ $key = Jwk::fromJson($json)->publicKey();          // EcKey | RsaKey | OkpKey
 Optional members (`kid`, `alg`, `use`) are carried in `toArray()` but **never** thumbprinted:
 `$jwk->withKid('k1')->thumbprint()` is unchanged.
 
+An RSA key fits every RS* tier, so an RSA JWK's `alg` (`RS256`, `RS384` or `RS512`) names the
+tier and `algorithm()` returns it — `RS256` when the member is absent. Verify with that tier:
+`new Rs($jwk->publicKey(), $jwk->algorithm())`. Any other `alg` on an RSA key (`ES256`, `HS256`,
+`PS256`, `none`) is still refused.
+
 **Parsing is strict, on purpose.** RFC 7517 says unknown members *should* be ignored; this
 package **rejects** them, because its callers round-trip documents this fleet mints, and a
 member you silently carry is a member an attacker chose. Rejected: unknown members (`x5c`,

@@ -12,6 +12,7 @@ use RoundlyConsulting\Crypto\Signature\Key\OkpKey;
 use RoundlyConsulting\Crypto\Signature\Key\PublicKey;
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
 use RoundlyConsulting\Crypto\Signature\KeyLoadException;
+use RoundlyConsulting\Crypto\Signature\Rs;
 use RoundlyConsulting\Crypto\Signature\WeakKeyException;
 use RoundlyConsulting\Crypto\Testing\TestKeys;
 
@@ -326,6 +327,36 @@ it('rejects an alg that contradicts the key type and curve', function (): void {
     expect(fn (): Jwk => Jwk::fromArray($members))
         ->toThrow(MalformedJwkException::class, 'expected ES256');
 });
+
+it('accepts every RS tier on an RSA JWK and pins the key to it', function (Algorithm $algorithm): void {
+    $members = rsaJwkMembers();
+    $members['alg'] = $algorithm->value;
+
+    $jwk = Jwk::fromArray($members);
+    $signature = (new Rs(RsaKey::private(keyPem('rsa-private')), $algorithm))->sign('payload');
+
+    expect($jwk->alg())->toBe($algorithm->value)
+        ->and($jwk->algorithm())->toBe($algorithm)
+        ->and((new Rs($jwk->publicKey(), $jwk->algorithm()))->verify('payload', $signature))->toBeTrue()
+        ->and(Jwk::fromPublicKey($jwk->publicKey())->withAlg($algorithm)->algorithm())->toBe($algorithm);
+})->with([Algorithm::RS256, Algorithm::RS384, Algorithm::RS512]);
+
+it('defaults an RSA JWK without alg to RS256', function (): void {
+    $jwk = Jwk::fromArray(rsaJwkMembers());
+
+    expect($jwk->algorithm())->toBe(Algorithm::RS256)
+        ->and($jwk->withAlg(Algorithm::RS512)->withAlg(null)->algorithm())->toBe(Algorithm::RS256);
+});
+
+it('still rejects a non-RSA alg on an RSA JWK', function (string $alg): void {
+    $members = rsaJwkMembers();
+    $members['alg'] = $alg;
+
+    expect(fn (): Jwk => Jwk::fromArray($members))
+        ->toThrow(MalformedJwkException::class, 'expected RS256, RS384 or RS512')
+        ->and(fn (): Jwk => Jwk::fromArray(rsaJwkMembers())->withAlg(Algorithm::tryFrom($alg) ?? Algorithm::ES256))
+        ->toThrow(MalformedJwkException::class, 'expected RS256, RS384 or RS512');
+})->with(['ES256', 'HS256', 'PS256', 'none']);
 
 it('rejects a non-signature use and an empty kid on parse', function (): void {
     $withUse = ecJwkMembers();

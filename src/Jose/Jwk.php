@@ -192,19 +192,19 @@ final readonly class Jwk implements JsonSerializable
     }
 
     /**
-     * The signature algorithm this key is pinned to, derived from `kty` + `crv` —
-     * never read from the `alg` member, which an attacker controls.
+     * The signature algorithm this key is pinned to.
+     *
+     * EC and OKP keys: derived from `kty` + `crv` — the curve fixes the algorithm,
+     * so the `alg` member can only agree with it. RSA keys fit every RS* tier, so
+     * there the (validated) `alg` names the tier — RS256, RS384 or RS512, never an
+     * algorithm of another family — and an RSA JWK without one is RS256. Build the
+     * verifier with it: `new Rs($jwk->publicKey(), $jwk->algorithm())`.
      */
     public function algorithm(): Algorithm
     {
         return match ($this->keyType) {
-            JwkKeyType::Rsa => Algorithm::RS256,
-            JwkKeyType::Okp => Algorithm::EdDSA,
-            JwkKeyType::Ec => match ($this->members['crv']) {
-                'P-384' => Algorithm::ES384,
-                'P-521' => Algorithm::ES512,
-                default => Algorithm::ES256,
-            },
+            JwkKeyType::Rsa => Algorithm::from($this->members['alg'] ?? Algorithm::RS256->value),
+            default => $this->admissibleAlgorithms()[0],
         };
     }
 
@@ -239,15 +239,12 @@ final readonly class Jwk implements JsonSerializable
     }
 
     /**
-     * @throws MalformedJwkException when the algorithm is not the one this key type and curve imply
+     * @throws MalformedJwkException when the algorithm is not one this key admits (the curve's for EC/OKP, an RS* tier for RSA)
      */
     public function withAlg(?Algorithm $alg): self
     {
-        if ($alg !== null && $alg !== $this->algorithm()) {
-            throw MalformedJwkException::invalidMember(
-                'alg',
-                "is {$alg->value}, which does not match this key (expected {$this->algorithm()->value})",
-            );
+        if ($alg !== null) {
+            $this->assertAdmissible($alg->value);
         }
 
         return $this->withOptional('alg', $alg?->value);
@@ -574,19 +571,49 @@ final readonly class Jwk implements JsonSerializable
         }
 
         if (isset($members['alg'])) {
-            $expected = $jwk->algorithm();
-
-            if ($members['alg'] !== $expected->value) {
-                throw MalformedJwkException::invalidMember(
-                    'alg',
-                    "is {$members['alg']}, which does not match this key (expected {$expected->value})",
-                );
-            }
+            $jwk->assertAdmissible($members['alg']);
         }
 
         if (isset($members['use']) && $members['use'] !== 'sig') {
             throw MalformedJwkException::invalidMember('use', "is [{$members['use']}]; only 'sig' keys are usable here");
         }
+    }
+
+    /**
+     * The algorithms this key may be used with: every RS* tier for RSA, and the
+     * one algorithm the curve implies for EC and OKP.
+     *
+     * @return non-empty-list<Algorithm>
+     */
+    private function admissibleAlgorithms(): array
+    {
+        return match ($this->keyType) {
+            JwkKeyType::Rsa => [Algorithm::RS256, Algorithm::RS384, Algorithm::RS512],
+            JwkKeyType::Okp => [Algorithm::EdDSA],
+            JwkKeyType::Ec => [match ($this->members['crv']) {
+                'P-384' => Algorithm::ES384,
+                'P-521' => Algorithm::ES512,
+                default => Algorithm::ES256,
+            }],
+        };
+    }
+
+    /**
+     * @throws MalformedJwkException when the algorithm is not one this key admits
+     */
+    private function assertAdmissible(string $alg): void
+    {
+        $admissible = $this->admissibleAlgorithms();
+
+        if (in_array(Algorithm::tryFrom($alg), $admissible, true)) {
+            return;
+        }
+
+        $names = array_map(static fn (Algorithm $algorithm): string => $algorithm->value, $admissible);
+        $last = array_pop($names);
+        $expected = $names === [] ? $last : implode(', ', $names).' or '.$last;
+
+        throw MalformedJwkException::invalidMember('alg', "is {$alg}, which does not match this key (expected {$expected})");
     }
 
     /**
