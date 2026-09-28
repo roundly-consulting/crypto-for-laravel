@@ -523,7 +523,8 @@ require dirname(__DIR__).'/vendor/roundly-consulting/crypto-for-laravel/src/Test
 expect($token)->toBeValidJws($verifier, Algorithm::RS256);
 expect($code)->toBeValidTotp($secret);
 expect($ca->chain)->toBeLinked();                     // the math, not trust
-expect($ca->leaf())->toBeSignedBy($ca->root());
+expect($ca->leaf())->toBeSignedBy($ca->chain->get(1));  // the intermediate signed the leaf
+expect($ca->chain->get(1))->toBeSignedBy($ca->root());
 expect($jwk)->toHaveThumbprint('NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs');
 ```
 
