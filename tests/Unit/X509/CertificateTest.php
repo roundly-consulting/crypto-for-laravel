@@ -10,6 +10,7 @@ use RoundlyConsulting\Crypto\Signature\Key\EcKey;
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
 use RoundlyConsulting\Crypto\Signature\WeakKeyException;
 use RoundlyConsulting\Crypto\Testing\TestCertificates;
+use RoundlyConsulting\Crypto\Testing\TestLeafOptions;
 use RoundlyConsulting\Crypto\X509\Certificate;
 use RoundlyConsulting\Crypto\X509\DistinguishedName;
 use RoundlyConsulting\Crypto\X509\InvalidLeewayException;
@@ -82,6 +83,42 @@ it('reads the DNS names of subjectAltName and ignores everything else', function
     expect($withSans->leaf()->dnsNames())->toBe(['app.example', '*.wildcard.example'])
         ->and($without->leaf()->dnsNames())->toBe([]);
 });
+
+it('reads each dNSName from the DER, so a comma inside one cannot forge a second', function (): void {
+    // One dNSName whose text looks like two: OpenSSL pretty-prints it as
+    // "DNS:evil.example, DNS:victim.example", which a text split reads as two names.
+    $leaf = TestCertificates::selfSigned(dnsNames: ['evil.example, DNS:victim.example'])->leaf();
+
+    expect($leaf->dnsNames())->toBe(['evil.example, DNS:victim.example'])
+        ->and($leaf->dnsNames())->not->toContain('victim.example');
+});
+
+it('reads only the dNSName entries of a mixed subjectAltName, verbatim', function (): void {
+    $general = static fn (int $tag, string $value): string => chr(0x80 | $tag).chr(strlen($value)).$value;
+    $names = $general(2, 'a.example')
+        .$general(1, 'root@a.example')                 // rfc822Name
+        .$general(7, "\x7F\x00\x00\x01")               // iPAddress
+        .$general(6, 'https://a.example/')             // uniformResourceIdentifier
+        .$general(2, "bank.example\x00.evil.example"); // a NUL stays IN the name
+
+    $leaf = TestCertificates::selfSigned(
+        dnsNames: [],
+        options: new TestLeafOptions(rawExtensions: ['2.5.29.17' => "\x30".chr(strlen($names)).$names]),
+    )->leaf();
+
+    expect($leaf->dnsNames())->toBe(['a.example', "bank.example\x00.evil.example"]);
+});
+
+it('refuses a certificate whose subjectAltName is not a valid GeneralNames', function (string $san): void {
+    expect(fn (): mixed => TestCertificates::selfSigned(
+        dnsNames: [],
+        options: new TestLeafOptions(rawExtensions: ['2.5.29.17' => $san]),
+    ))->toThrow(MalformedCertificateException::class, 'could not be parsed');
+})->with([
+    'a SET, not a SEQUENCE' => ["\x31\x0B\x82\x09a.example"],
+    'a constructed dNSName' => ["\x30\x0D\xA2\x0B\x16\x09a.example"],
+    'a dNSName outside IA5' => ["\x30\x0C\x82\x0A\xC3\xA4.example"],
+]);
 
 it('hands over an EC or RSA public key that verifies real signatures', function (string $keyType, string $class): void {
     $chain = TestCertificates::chain(leafKeyType: $keyType);

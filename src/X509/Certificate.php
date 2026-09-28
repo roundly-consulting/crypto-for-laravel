@@ -36,6 +36,11 @@ final readonly class Certificate
     /** A cap on a single certificate's bytes — real certificates are a few KiB. */
     public const int MAX_CERTIFICATE_BYTES = 65536;
 
+    private const string SUBJECT_ALT_NAME = '2.5.29.17';
+
+    /** GeneralName ::= CHOICE { …, dNSName [2] IA5String, … } */
+    private const int DNS_NAME_TAG = 2;
+
     /**
      * @param  list<string>  $dnsNames
      * @param  array<string, Extension>  $extensions  keyed by OID
@@ -169,8 +174,9 @@ final readonly class Certificate
     }
 
     /**
-     * The `DNS:` entries of subjectAltName, wildcards verbatim. IP/email/URI SANs
-     * are ignored by design.
+     * The dNSName entries of subjectAltName, read from the DER and returned
+     * verbatim (wildcards included), in encoding order. IP/email/URI/directory
+     * SANs are ignored by design.
      *
      * @return list<string>
      */
@@ -332,6 +338,7 @@ final readonly class Certificate
         // — one failure class for one question, "can this be read at all".
         try {
             $tbs = self::tbsCertificate($der);
+            $extensions = self::extensionsFrom($tbs);
 
             return new self(
                 handle: $handle,
@@ -339,14 +346,14 @@ final readonly class Certificate
                 der: $der,
                 subject: self::name($parsed['subject'] ?? null),
                 issuer: self::name($parsed['issuer'] ?? null),
-                dnsNames: self::dnsNamesFrom($parsed['extensions'] ?? null),
+                dnsNames: self::dnsNamesFrom($extensions),
                 serialNumber: $serial === null ? null : strtoupper($serial),
                 signatureAlgorithm: self::text($parsed, 'signatureTypeLN'),
                 notBefore: self::instantFrom($parsed, 'validFrom_time_t'),
                 notAfter: self::instantFrom($parsed, 'validTo_time_t'),
                 version: self::versionFrom($tbs),
                 subjectIsEmpty: self::subjectIsEmptyIn($tbs),
-                extensions: self::extensionsFrom($tbs),
+                extensions: $extensions,
             );
         } catch (MalformedDerException) {
             throw MalformedCertificateException::unparseable();
@@ -514,22 +521,47 @@ final readonly class Certificate
     }
 
     /**
+     * The dNSName entries of subjectAltName, read from the DER.
+     *
+     * GeneralNames ::= SEQUENCE OF GeneralName, and dNSName is `[2] IMPLICIT
+     * IA5String` (RFC 5280 §4.2.1.6). Walking the structure is the only faithful
+     * read: OpenSSL's pretty-printed text joins entries with ", ", so a single
+     * dNSName CONTAINING ", DNS:victim.example" would split into a name the
+     * certificate never carried. Each value is returned verbatim — a NUL inside
+     * one stays inside it — and anything that is not IA5 is a malformed
+     * certificate, not a name.
+     *
+     * @param  array<string, Extension>  $extensions
      * @return list<string>
+     *
+     * @throws MalformedDerException
      */
-    private static function dnsNamesFrom(mixed $extensions): array
+    private static function dnsNamesFrom(array $extensions): array
     {
-        if (! is_array($extensions) || ! is_string($extensions['subjectAltName'] ?? null)) {
+        $san = $extensions[self::SUBJECT_ALT_NAME] ?? null;
+
+        if ($san === null) {
             return [];
+        }
+
+        $generalNames = (new DerDecoder)->decode($san->der);
+
+        if ($generalNames->class !== TagClass::Universal || $generalNames->tag !== 16) {
+            throw MalformedDerException::unexpectedTag('GeneralNames SEQUENCE', $generalNames->tag);
         }
 
         $names = [];
 
-        foreach (explode(',', (string) $extensions['subjectAltName']) as $entry) {
-            $entry = trim($entry);
-
-            if (str_starts_with($entry, 'DNS:')) {
-                $names[] = substr($entry, 4);
+        foreach ($generalNames->children() as $general) {
+            if ($general->class !== TagClass::ContextSpecific || $general->tag !== self::DNS_NAME_TAG) {
+                continue;
             }
+
+            if ($general->constructed || preg_match('/[^\x00-\x7F]/', $general->contents) === 1) {
+                throw MalformedDerException::malformedContents('dNSName', 'it is not a primitive IA5String');
+            }
+
+            $names[] = $general->contents;
         }
 
         return $names;
