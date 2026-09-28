@@ -23,15 +23,15 @@ use RoundlyConsulting\Crypto\Otp\Hotp;
 use RoundlyConsulting\Crypto\Otp\OtpAlgorithm;
 use RoundlyConsulting\Crypto\Otp\ProvisioningUri;
 use RoundlyConsulting\Crypto\Otp\Totp;
-use RoundlyConsulting\Crypto\Random\Bytes;
-use RoundlyConsulting\Crypto\Random\Secret;
-use RoundlyConsulting\Crypto\Random\Token;
+use RoundlyConsulting\Crypto\Random\Csprng;
 use RoundlyConsulting\Crypto\Signature\Algorithm;
+use RoundlyConsulting\Crypto\Signature\Ec\DerCodec;
 use RoundlyConsulting\Crypto\Signature\EdDSA;
 use RoundlyConsulting\Crypto\Signature\Es;
 use RoundlyConsulting\Crypto\Signature\Hs;
 use RoundlyConsulting\Crypto\Signature\Key\EcKey;
 use RoundlyConsulting\Crypto\Signature\Key\HmacSecret;
+use RoundlyConsulting\Crypto\Signature\Key\Keys;
 use RoundlyConsulting\Crypto\Signature\Key\OkpKey;
 use RoundlyConsulting\Crypto\Signature\Key\PublicKey;
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
@@ -39,6 +39,7 @@ use RoundlyConsulting\Crypto\Signature\KeyLoadException;
 use RoundlyConsulting\Crypto\Signature\KeyVerifier;
 use RoundlyConsulting\Crypto\Signature\Rs;
 use RoundlyConsulting\Crypto\X509\Certificate;
+use RoundlyConsulting\Crypto\X509\Certificates;
 use RoundlyConsulting\Crypto\X509\Chain;
 use RoundlyConsulting\Crypto\X509\InvalidChainException;
 use RoundlyConsulting\Crypto\X509\MalformedCertificateException;
@@ -50,9 +51,20 @@ use SensitiveParameter;
  * Fronted by the {@see Facades\Crypto} facade so that typing `Crypto::` reveals
  * every entry point — codecs, CSPRNG, hashing, signers, JOSE, COSE, and OTP.
  * Every helper takes key material and knobs as explicit arguments; this manager
- * reads no config and holds no secret. The purely-static codecs and CSPRNG are
- * surfaced as passthroughs returning the computed value; stateful entry points
- * and keyed signers are returned as short-lived instances.
+ * reads no config of its own and holds no secret. The purely-static codecs and
+ * CSPRNG are surfaced as passthroughs returning the computed value; stateful
+ * entry points and keyed signers are returned as short-lived instances.
+ *
+ * Four sub-accessors group the factories a flat list would bury — `keys()`,
+ * `random()`, `x509()` and `ecDer()` — so the facade can build every key its
+ * own signers take. The overlapping flat methods (`certificate()`,
+ * `chainFrom*()`, `generateHmacSecret()`, `random*()`) are shortcuts that run
+ * through those sub-accessors, so each factory has exactly one code path.
+ *
+ * There are no actions and no fake: the package is stateless computation with
+ * no database, queue, event, mail or HTTP call to intercept. The only I/O — the
+ * opt-in key loaders' disk reads and first-boot writes — goes through Laravel's
+ * `Storage`, which `Storage::fake()` already covers.
  */
 final class CryptoManager
 {
@@ -104,7 +116,7 @@ final class CryptoManager
      */
     public function certificate(string $pem): Certificate
     {
-        return Certificate::fromPem($pem);
+        return $this->x509()->fromPem($pem);
     }
 
     /**
@@ -116,7 +128,7 @@ final class CryptoManager
      */
     public function chainFromX5c(array $x5c): Chain
     {
-        return Chain::fromX5c($x5c);
+        return $this->x509()->chain()->fromX5c($x5c);
     }
 
     /**
@@ -126,7 +138,16 @@ final class CryptoManager
      */
     public function chainFromPemBundle(string $bundle): Chain
     {
-        return Chain::fromPemBundle($bundle);
+        return $this->x509()->chain()->fromPemBundle($bundle);
+    }
+
+    /**
+     * Certificates from PEM, DER or an `x5c` entry, and — via `chain()` — chains
+     * from `x5c`, PEM lists, bundles or parsed certificates.
+     */
+    public function x509(): Certificates
+    {
+        return new Certificates;
     }
 
     // ── ASN.1 / DER (X.690) ─────────────────────────────────────────────────
@@ -190,7 +211,24 @@ final class CryptoManager
      */
     public function generateHmacSecret(int $bytes = 32): HmacSecret
     {
-        return HmacSecret::generate($bytes);
+        return $this->keys()->hmac()->generate($bytes);
+    }
+
+    /**
+     * Loaders and generators for every key family the signers take:
+     * `rsa()`, `ec()`, `ed25519()` and `hmac()`.
+     */
+    public function keys(): Keys
+    {
+        return new Keys;
+    }
+
+    /**
+     * The ECDSA signature codec: raw `r‖s` ↔ DER.
+     */
+    public function ecDer(): DerCodec
+    {
+        return new DerCodec;
     }
 
     // ── COSE / WebAuthn ─────────────────────────────────────────────────────
@@ -241,19 +279,28 @@ final class CryptoManager
 
     // ── CSPRNG ──────────────────────────────────────────────────────────────
 
+    /**
+     * Bytes, URL-safe / numeric / alphanumeric / custom-alphabet tokens, and
+     * base32 secrets.
+     */
+    public function random(): Csprng
+    {
+        return new Csprng;
+    }
+
     public function randomBytes(int $length): string
     {
-        return Bytes::generate($length);
+        return $this->random()->bytes($length);
     }
 
     public function randomToken(int $length = 40): string
     {
-        return Token::urlSafe($length);
+        return $this->random()->token($length);
     }
 
     public function randomSecret(int $chars = 32): string
     {
-        return Secret::base32($chars);
+        return $this->random()->secret($chars);
     }
 
     // ── Codecs ──────────────────────────────────────────────────────────────
