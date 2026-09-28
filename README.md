@@ -441,6 +441,10 @@ $code   = Token::fromAlphabet('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 10);
 The facade groups the same helpers under `Crypto::random()`: `bytes(32)`, `token(40)`,
 `numeric(6)`, `alphanumeric(24)`, `fromAlphabet($alphabet, 10)` and `secret(32)` (base32, for TOTP).
 
+`Secret::base32($chars)` (and `secret()` / `randomSecret()`) always returns a secret that `Totp`,
+`Hotp` and `Base32::decode()` accept. A length of 1, 3 or 6 (mod 8) has no canonical base32 form,
+so such a request rounds **up** one character (`17` → 18 chars); every other length is exact.
+
 ### Codecs (`Codec\*`)
 
 ```php

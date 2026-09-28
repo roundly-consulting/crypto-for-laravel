@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use RoundlyConsulting\Crypto\Codec\Base32;
 use RoundlyConsulting\Crypto\Codec\Base64Url;
+use RoundlyConsulting\Crypto\Otp\Hotp;
+use RoundlyConsulting\Crypto\Otp\Totp;
 use RoundlyConsulting\Crypto\Random\Bytes;
 use RoundlyConsulting\Crypto\Random\InvalidLengthException;
 use RoundlyConsulting\Crypto\Random\Secret;
@@ -96,6 +98,20 @@ it('generates canonical base32 secrets of varying length', function (int $chars)
     expect(strlen($secret))->toBe($chars);
     Base32::decode($secret);
 })->with([16, 26, 40, 52, 63]);
+
+it('only ever generates a secret the strict decoder and the OTP layer accept', function (int $chars): void {
+    $secret = Secret::base32($chars);
+
+    // A base32 string of 1, 3 or 6 characters mod 8 has a dangling character
+    // that encodes no byte — no canonical encoding has that length — so such a
+    // request rounds UP one character (never down: never less entropy).
+    $expected = in_array($chars % 8, [1, 3, 6], true) ? $chars + 1 : $chars;
+
+    expect(strlen($secret))->toBe($expected)
+        ->and(Base32::encode(Base32::decode($secret)))->toBe($secret)
+        ->and((new Totp)->codeAt($secret, 59))->toMatch('/^\d{6}$/')
+        ->and((new Hotp)->at($secret, 0))->toMatch('/^\d{6}$/');
+})->with([...range(1, 64), 4094, 4095, Secret::MAXIMUM_CHARS]);
 
 it('rejects a non-positive secret length', function (): void {
     Secret::base32(0);

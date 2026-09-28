@@ -60,7 +60,8 @@ final readonly class Csprng
     }
 
     /**
-     * A TOTP-ready base32 secret of exactly $chars characters.
+     * A TOTP-ready base32 secret of $chars characters (one more when $chars is
+     * 1, 3 or 6 mod 8 — see {@see Secret::base32()}).
      *
      * @throws InvalidLengthException below 1 or above {@see Secret::MAXIMUM_CHARS} characters
      */
