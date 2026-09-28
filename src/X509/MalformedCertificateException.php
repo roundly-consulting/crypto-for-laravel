@@ -17,6 +17,11 @@ final class MalformedCertificateException extends CryptoException
         return new self('The certificate could not be read; it is not valid PEM or DER.');
     }
 
+    public static function notExactDer(): self
+    {
+        return new self('The input is not exactly one DER certificate: it carries trailing bytes, or an encoding OpenSSL had to rewrite.');
+    }
+
     public static function unparseable(): self
     {
         return new self('The certificate was read but could not be parsed.');

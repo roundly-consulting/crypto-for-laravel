@@ -320,6 +320,18 @@ it('rejects malformed certificate input with a typed exception', function (strin
     'a key, not a cert' => ["-----BEGIN PUBLIC KEY-----\nQUJD\n-----END PUBLIC KEY-----\n"],
 ]);
 
+it('refuses DER carrying bytes after the certificate', function (): void {
+    // Two different x5c strings must never map to one certificate: OpenSSL reads
+    // the leading certificate and would silently drop the tail.
+    $der = TestCertificates::selfSigned()->leaf()->der();
+
+    expect(fn (): Certificate => Certificate::fromDer($der.'JUNK'))
+        ->toThrow(MalformedCertificateException::class, 'not exactly one DER certificate')
+        ->and(fn (): Certificate => Certificate::fromBase64(base64_encode($der."\x00")))
+        ->toThrow(MalformedCertificateException::class, 'not exactly one DER certificate')
+        ->and(Certificate::fromDer($der)->der())->toBe($der);
+});
+
 it('never reads a file:// path handed in as PEM', function (): void {
     // openssl_x509_read() treats a "file://" string as a PATH. A host passing an
     // untrusted "PEM" (a forwarded client-cert header, say) must not be able to

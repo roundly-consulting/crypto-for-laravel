@@ -74,6 +74,11 @@ final readonly class Certificate
     }
 
     /**
+     * Exactly one certificate's DER. OpenSSL reads the LEADING certificate and
+     * silently drops anything after it, so the bytes it hands back are compared
+     * with the input: a tail (or an encoding OpenSSL rewrote) is refused, so two
+     * different inputs can never be the same certificate.
+     *
      * @throws MalformedCertificateException
      */
     public static function fromDer(string $der): self
@@ -86,7 +91,13 @@ final readonly class Certificate
             .chunk_split(base64_encode($der), 64, "\n")
             ."-----END CERTIFICATE-----\n";
 
-        return self::fromHandle(OpenSslX509::read($pem));
+        $certificate = self::fromHandle(OpenSslX509::read($pem));
+
+        if (! hash_equals($certificate->der, $der)) {
+            throw MalformedCertificateException::notExactDer();
+        }
+
+        return $certificate;
     }
 
     /**
