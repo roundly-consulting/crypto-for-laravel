@@ -83,12 +83,20 @@ final class Token
     /**
      * A token of $length characters drawn uniformly from the given alphabet.
      *
-     * @throws InvalidLengthException when the alphabet is empty or $length < 1
+     * The alphabet is UTF-8 TEXT and is drawn from character by character, so a
+     * multibyte alphabet (`'äöü'`, emoji) yields valid UTF-8 of exactly $length
+     * characters — indexing bytes would split a character in half.
+     *
+     * @throws InvalidLengthException when the alphabet is empty or not UTF-8, or $length < 1
      */
     public static function fromAlphabet(string $alphabet, int $length): string
     {
         if ($alphabet === '') {
             throw InvalidLengthException::emptyAlphabet();
+        }
+
+        if (! mb_check_encoding($alphabet, 'UTF-8')) {
+            throw InvalidLengthException::alphabetNotUtf8();
         }
 
         if ($length < 1) {
@@ -99,11 +107,12 @@ final class Token
             throw InvalidLengthException::tooLong($length, self::MAXIMUM_LENGTH);
         }
 
-        $max = strlen($alphabet) - 1;
+        $characters = mb_str_split($alphabet, 1, 'UTF-8');
+        $max = count($characters) - 1;
         $token = '';
 
         for ($i = 0; $i < $length; $i++) {
-            $token .= $alphabet[random_int(0, $max)];
+            $token .= $characters[random_int(0, $max)];
         }
 
         return $token;

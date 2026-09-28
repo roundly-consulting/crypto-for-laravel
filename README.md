@@ -450,6 +450,10 @@ $alnum  = Token::alphanumeric(24);           // 0-9A-Za-z
 $code   = Token::fromAlphabet('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 10);
 ```
 
+`fromAlphabet()` takes UTF-8 text and draws whole characters, so a multibyte alphabet
+(`'äöü'`, emoji) yields valid UTF-8 of exactly the requested number of characters; an alphabet
+that is not valid UTF-8 throws `InvalidLengthException`.
+
 The facade groups the same helpers under `Crypto::random()`: `bytes(32)`, `token(40)`,
 `numeric(6)`, `alphanumeric(24)`, `fromAlphabet($alphabet, 10)` and `secret(32)` (base32, for TOTP).
 

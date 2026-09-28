@@ -56,6 +56,27 @@ it('generates a token from a custom alphabet', function (): void {
         ->and($token)->toMatch('/^[AB]+$/');
 });
 
+it('draws whole characters from a multibyte alphabet, never bytes', function (): void {
+    $token = Token::fromAlphabet('äöü', 200);
+
+    expect(mb_check_encoding($token, 'UTF-8'))->toBeTrue()
+        ->and(mb_strlen($token, 'UTF-8'))->toBe(200)
+        ->and($token)->toMatch('/^[äöü]+$/u')
+        // 200 draws from three symbols: every one of them shows up.
+        ->and(count(array_unique(mb_str_split($token, 1, 'UTF-8'))))->toBe(3);
+});
+
+it('draws emoji and mixed-width characters whole', function (): void {
+    $token = Token::fromAlphabet('a€😀', 60);
+
+    expect(mb_check_encoding($token, 'UTF-8'))->toBeTrue()
+        ->and(mb_strlen($token, 'UTF-8'))->toBe(60);
+});
+
+it('rejects an alphabet that is not UTF-8 text', function (): void {
+    Token::fromAlphabet("AB\xFF", 10);
+})->throws(InvalidLengthException::class, 'UTF-8');
+
 it('generates a numeric token of the exact length', function (): void {
     $token = Token::numeric(10);
 

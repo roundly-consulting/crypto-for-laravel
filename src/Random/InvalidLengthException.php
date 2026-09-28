@@ -8,7 +8,7 @@ use RoundlyConsulting\Crypto\Exceptions\CryptoException;
 
 /**
  * Thrown when a requested random length is out of range (e.g. non-positive, or
- * below a security floor).
+ * below a security floor), or a token alphabet is unusable (empty, not UTF-8).
  */
 final class InvalidLengthException extends CryptoException
 {
@@ -25,5 +25,10 @@ final class InvalidLengthException extends CryptoException
     public static function emptyAlphabet(): self
     {
         return new self('The alphabet must contain at least one character.');
+    }
+
+    public static function alphabetNotUtf8(): self
+    {
+        return new self('The alphabet must be valid UTF-8 text; its characters are drawn whole.');
     }
 }
