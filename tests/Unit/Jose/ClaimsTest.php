@@ -82,3 +82,30 @@ it('rejects an iat in the future', function (): void {
 it('requires exp for temporal validation', function (): void {
     (new Claims(['sub' => 'x']))->assertTemporal();
 })->throws(ClaimMismatchException::class);
+
+it('never wraps a whole float beyond the 64-bit range into an integer', function (float $value): void {
+    // 1e19 would cast to -8446744073709551616 — a far-future nbf read as "long ago".
+    (new Claims(['exp' => $value]))->int('exp');
+})->throws(ClaimMismatchException::class, 'within the 64-bit integer range')->with([
+    '1e19' => [1.0e19],
+    '-1e19' => [-1.0e19],
+    '2^63' => [9_223_372_036_854_775_808.0],
+    'INF (a JSON 1e400)' => [INF],
+    '-INF' => [-INF],
+]);
+
+it('refuses a far-future nbf rather than treating it as already valid', function (): void {
+    CarbonImmutable::setTestNow(CarbonImmutable::createFromTimestamp(1_000));
+
+    // Straight from the wire: a JSON number too big for an int decodes as a float.
+    $claims = new Claims(json_decode('{"exp":2000,"nbf":10000000000000000000}', true));
+
+    $claims->assertTemporal();
+})->throws(ClaimMismatchException::class);
+
+it('still reads whole floats at the edges of the 64-bit range', function (): void {
+    $claims = new Claims(['max' => 4_611_686_018_427_387_904.0, 'min' => (float) PHP_INT_MIN]);
+
+    expect($claims->int('max'))->toBe(4_611_686_018_427_387_904)
+        ->and($claims->int('min'))->toBe(PHP_INT_MIN);
+});

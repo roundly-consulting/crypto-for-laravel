@@ -18,6 +18,9 @@ use Carbon\CarbonImmutable;
  */
 final readonly class Claims
 {
+    /** -2^63 as a float, exactly: the bottom of the int range (and minus it, the exclusive top). */
+    private const float INT_RANGE_FLOOR = -9_223_372_036_854_775_808.0;
+
     /**
      * @param  array<string, mixed>  $claims
      */
@@ -60,7 +63,8 @@ final readonly class Claims
     }
 
     /**
-     * @throws ClaimMismatchException when absent or not an integer
+     * @throws ClaimMismatchException when absent, not an integer, or a whole
+     *                                number outside the 64-bit integer range
      */
     public function int(string $name): int
     {
@@ -72,11 +76,19 @@ final readonly class Claims
             return $value;
         }
 
-        if (is_float($value) && floor($value) === $value) {
-            return (int) $value;
+        if (! is_float($value) || floor($value) !== $value) {
+            throw ClaimMismatchException::notA($name, 'an integer');
         }
 
-        throw ClaimMismatchException::notA($name, 'an integer');
+        // A JSON number too big for an int decodes as a float, and casting one
+        // past the range WRAPS (1e19 → -8446744073709551616): a far-future `nbf`
+        // would read as long past. [-2^63, 2^63) is exactly what an int holds;
+        // ±INF and NaN fail the comparison too.
+        if ($value < self::INT_RANGE_FLOOR || $value >= -self::INT_RANGE_FLOOR) {
+            throw ClaimMismatchException::notA($name, 'an integer within the 64-bit integer range');
+        }
+
+        return (int) $value;
     }
 
     /**
