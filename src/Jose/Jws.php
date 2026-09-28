@@ -36,6 +36,9 @@ final class Jws
      * `typ: JWT` and the signer's `alg`; JSON is encoded deterministically so
      * byte-for-byte parity fixtures reproduce exactly.
      *
+     * The claims are always a JSON OBJECT (RFC 7519 §7.2): no claims encode as
+     * `{}`, never the `[]` PHP's json_encode() makes of an empty array.
+     *
      * @param  array<string, mixed>  $header  extra protected-header entries (e.g. `kid`)
      * @param  array<string, mixed>  $payload
      *
@@ -47,7 +50,7 @@ final class Jws
 
         $segments = [
             Base64Url::encode($this->json($header)),
-            Base64Url::encode($this->json($payload)),
+            Base64Url::encode($payload === [] ? '{}' : $this->json($payload)),
         ];
 
         $segments[] = Base64Url::encode($signer->sign(implode('.', $segments)));
@@ -160,7 +163,10 @@ final class Jws
             throw MalformedTokenException::make("The token {$part} is not valid JSON.");
         }
 
-        if (! is_array($decoded) || (array_is_list($decoded) && $decoded !== [])) {
+        // json_decode(…, true) maps `{}` and `[]` alike to PHP's [], so the JSON
+        // TYPE is read off the text: valid JSON whose first significant byte is
+        // `{` is an object, and nothing else is.
+        if (! is_array($decoded) || ! str_starts_with(ltrim($json, " \t\n\r"), '{')) {
             throw MalformedTokenException::make("The token {$part} must be a JSON object.");
         }
 

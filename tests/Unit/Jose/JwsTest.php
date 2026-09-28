@@ -207,3 +207,20 @@ it('signs a flattened JWS whose signature verifies', function (): void {
 it('rejects unencodable claims', function (): void {
     (new Jws)->sign([], ['bad' => "\xB1\x31"], hsSigner());
 })->throws(MalformedTokenException::class);
+
+it('encodes empty claims as the JSON object {}, never the array []', function (): void {
+    $compact = (new Jws)->sign([], [], hsSigner());
+    [, $payload] = explode('.', $compact);
+
+    expect(Base64Url::decode($payload))->toBe('{}')
+        ->and((new Jws)->verify($compact, hsSigner(), Algorithm::HS256)->all())->toBe([]);
+});
+
+it('rejects a signed payload that is the JSON array [] rather than an object', function (string $json): void {
+    // A genuinely signed token: only the payload's JSON TYPE is wrong.
+    $header = Base64Url::encode('{"typ":"JWT","alg":"HS256"}');
+    $payload = Base64Url::encode($json);
+    $signature = Base64Url::encode(hsSigner()->sign($header.'.'.$payload));
+
+    (new Jws)->verify($header.'.'.$payload.'.'.$signature, hsSigner(), Algorithm::HS256);
+})->throws(MalformedTokenException::class, 'must be a JSON object')->with(['[]', ' [ ] ', '"claims"', '42']);
