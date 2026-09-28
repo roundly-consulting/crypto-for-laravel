@@ -82,6 +82,17 @@ it('round-trips a real subjectAltName through the DER walk', function (): void {
         ->and($leaf->dnsNames())->toBe($names);
 });
 
+it('keys an extension under a multi-octet first-arc OID exactly as openssl names it', function (): void {
+    // 2.999.3 encodes as 88 37 03: the first subidentifier (999 + 80) spans two octets.
+    $leaf = TestCertificates::selfSigned(
+        options: new TestLeafOptions(rawExtensions: ['2.999.3' => "\x04\x01X"]),
+    )->leaf();
+
+    expect($leaf->extension('2.999.3')?->der)->toBe("\x04\x01X")
+        ->and(array_keys($leaf->extensions()))->toContain('2.999.3')
+        ->and(array_keys($leaf->extensions()))->not->toContain('2.56.55.3');
+});
+
 it('lists every extension keyed by OID', function (): void {
     $leaf = TestCertificates::chain(length: 1, dnsNames: ['x.example'])->leaf();
 

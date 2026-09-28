@@ -77,17 +77,11 @@ final readonly class DerElement
             throw MalformedDerException::malformedContents('OBJECT IDENTIFIER', 'it is empty');
         }
 
-        // X.690 §8.19.4: the first octet packs the first two arcs, and the first
-        // arc is capped at 2 (so 2.999 is legal and 3.x is not).
-        $first = ord($bytes[0]);
-        $arcs = $first < 80
-            ? [intdiv($first, 40), $first % 40]
-            : [2, $first - 80];
-
+        $subidentifiers = [];
         $value = 0;
         $started = false;
 
-        for ($i = 1, $length = strlen($bytes); $i < $length; $i++) {
+        for ($i = 0, $length = strlen($bytes); $i < $length; $i++) {
             $byte = ord($bytes[$i]);
 
             // A subidentifier may not begin with 0x80: that is a padded, and thus
@@ -104,7 +98,7 @@ final readonly class DerElement
             $started = true;
 
             if (($byte & 0x80) === 0) {
-                $arcs[] = $value;
+                $subidentifiers[] = $value;
                 $value = 0;
                 $started = false;
             }
@@ -113,6 +107,18 @@ final readonly class DerElement
         if ($started) {
             throw MalformedDerException::malformedContents('OBJECT IDENTIFIER', 'the final subidentifier is unterminated');
         }
+
+        // X.690 §8.19.4: the FIRST subidentifier packs the first two arcs as
+        // X·40 + Y. It is base-128 like every other one — under arc 2, Y is
+        // unbounded, so 2.999 is (999 + 80) spread over two octets, not one.
+        $first = array_shift($subidentifiers);
+        $arcs = match (true) {
+            $first < 40 => [0, $first],
+            $first < 80 => [1, $first - 40],
+            default => [2, $first - 80],
+        };
+
+        array_push($arcs, ...$subidentifiers);
 
         return implode('.', $arcs);
     }

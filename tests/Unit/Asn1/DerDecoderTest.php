@@ -81,6 +81,16 @@ it('decodes the OIDs the X.509 world is made of', function (string $hex, string 
     ['00', '0.0'],
     ['4F', '1.39'],                              // the 79 boundary of the packed first octet
     ['50', '2.0'],                               // and the 80 boundary
+    // Vectors below cross-checked with `openssl asn1parse`: the first
+    // subidentifier is base-128 like any other, so arc 2.x with x ≥ 48 spans
+    // more than one octet.
+    ['27', '0.39'],
+    ['28', '1.0'],
+    ['7F', '2.47'],
+    ['8100', '2.48'],
+    ['8837', '2.999'],
+    ['883703', '2.999.3'],
+    ['818000', '2.16304'],
 ]);
 
 it('decodes nested constructed elements', function (): void {
@@ -263,6 +273,12 @@ it('rejects a malformed object identifier', function (): void {
         // A subidentifier padded with a leading 0x80.
         ->and(fn (): mixed => decodeDer(derTlv(0x06, "\x2A\x80\x01"))->oid())
         ->toThrow(MalformedDerException::class, 'padded')
+        // The FIRST subidentifier padded with a leading 0x80.
+        ->and(fn (): mixed => decodeDer(derTlv(0x06, "\x80\x01"))->oid())
+        ->toThrow(MalformedDerException::class, 'padded')
+        // A first subidentifier that never terminates.
+        ->and(fn (): mixed => decodeDer(derTlv(0x06, "\x88"))->oid())
+        ->toThrow(MalformedDerException::class, 'unterminated')
         // The final subidentifier never terminates.
         ->and(fn (): mixed => decodeDer(derTlv(0x06, "\x2A\x86"))->oid())
         ->toThrow(MalformedDerException::class, 'unterminated')
