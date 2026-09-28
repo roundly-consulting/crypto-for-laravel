@@ -52,7 +52,7 @@ it('signs and verifies RS256 and ES256 round-trips', function (): void {
 
 it('signs and verifies the full SHA-2 signature tier', function (Algorithm $algorithm): void {
     $jws = new Jws;
-    $secret = HmacSecret::fromString('0123456789abcdef0123456789abcdef!');
+    $secret = HmacSecret::fromString(str_repeat('0123456789abcdef', 4));
     $signer = new Hs($secret, $algorithm);
 
     $compact = $jws->sign([], ['sub' => 'x'], $signer);
@@ -64,7 +64,7 @@ it('signs and verifies the full SHA-2 signature tier', function (Algorithm $algo
 ]);
 
 it('pins HS512 and rejects an HS512 token presented to an HS256 verifier', function (): void {
-    $secret = HmacSecret::fromString('0123456789abcdef0123456789abcdef!');
+    $secret = HmacSecret::fromString(str_repeat('0123456789abcdef', 4));
     $compact = (new Jws)->sign([], ['sub' => 'x'], new Hs($secret, Algorithm::HS512));
 
     (new Jws)->verify($compact, new Hs($secret, Algorithm::HS256), Algorithm::HS256);

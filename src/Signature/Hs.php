@@ -13,15 +13,30 @@ use RoundlyConsulting\Crypto\Signature\Key\HmacSecret;
  * The construction guard rejects any asymmetric algorithm, so an HMAC secret can
  * never be pressed into service for RS/ES/EdDSA — one half of the defence against
  * algorithm-confusion.
+ *
+ * RFC 7518 §3.2 requires a key at least as long as the hash output: 32 bytes for
+ * HS256 (which every {@see HmacSecret} already is), 48 for HS384 and 64 for
+ * HS512. A shorter key is refused here, because verifiers that enforce the rule
+ * reject every token it signs.
  */
 final readonly class Hs implements Signer, Verifier
 {
+    /**
+     * @throws AlgorithmMismatchException when the algorithm is not HS*
+     * @throws WeakKeyException when the secret is shorter than the algorithm's hash output
+     */
     public function __construct(
         private HmacSecret $key,
         private Algorithm $algorithm = Algorithm::HS256,
     ) {
         if (! $algorithm->isHmac()) {
             throw AlgorithmMismatchException::keyForAlgorithm($algorithm);
+        }
+
+        $minimum = strlen(hash($algorithm->hashName(), '', true));
+
+        if (strlen($key->value) < $minimum) {
+            throw WeakKeyException::shortSecretFor($algorithm, $minimum, strlen($key->value));
         }
     }
 

@@ -51,7 +51,7 @@ is a dependency.
 
 | Algorithm | Key type | Curve / digest | Sign | Verify | Notes |
 |---|---|---|---|---|---|
-| HS256 / HS384 / HS512 | `HmacSecret` | SHA-256/384/512 | ✅ | ✅ | secret ≥ 32 random bytes |
+| HS256 / HS384 / HS512 | `HmacSecret` | SHA-256/384/512 | ✅ | ✅ | secret ≥ 32 / 48 / 64 random bytes (the hash size, RFC 7518 §3.2) |
 | RS256 / RS384 / RS512 | `RsaKey` | RSA ≥ 2048, SHA-256/384/512 | ✅ | ✅ | |
 | ES256 / ES384 / ES512 | `EcKey` | P-256 / P-384 / P-521 | ✅ | ✅ | curve fixes the digest |
 | EdDSA | `OkpKey` | Ed25519 | ✅¹ | ✅¹ | ¹ needs `ext-sodium` |
@@ -67,7 +67,9 @@ is a dependency.
 The `Es` signer/verifier picks its digest and coordinate size from the key's own curve, so
 there is no way to mismatch a curve against a tier. `Hs`/`Rs` take the tier as an argument
 (`new Hs($secret, Algorithm::HS512)`, `new Rs($key, Algorithm::RS384)`); a verifier constructed
-for one tier never verifies another.
+for one tier never verifies another. `Hs` refuses a secret shorter than its tier's hash output —
+48 bytes for HS384, 64 for HS512 (`HmacSecret::generate(64)`) — with a `WeakKeyException`,
+because verifiers that enforce RFC 7518 §3.2 reject every token such a key signs.
 
 **Choosing an algorithm:** prefer **EdDSA** or **ES256** for new asymmetric tokens (small, fast);
 use **RS256** for interop with systems that require RSA; use **HS256** only when both sides share
@@ -474,7 +476,7 @@ hand-rolling them. These ship in `src/` but import no PHPUnit/Pest symbol:
 use RoundlyConsulting\Crypto\Testing\TestKeys;
 use RoundlyConsulting\Crypto\Testing\TestOtp;
 
-$secret = TestKeys::hmacSecret();      // a fixed, valid ≥32-byte secret
+$secret = TestKeys::hmacSecret();      // a fixed, valid 64-byte secret (every HS tier)
 $rsa    = TestKeys::rsa();             // ephemeral 2048-bit private key
 $ec     = TestKeys::ec('P-384');       // ephemeral EC private key
 $okp    = TestKeys::ed25519();         // ephemeral Ed25519 (guard on TestKeys::supportsEd25519())

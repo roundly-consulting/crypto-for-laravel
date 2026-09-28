@@ -20,11 +20,12 @@ use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
 final class TestKeys
 {
     /**
-     * A fixed, valid 33-byte HMAC secret (never use in production).
+     * A fixed, valid 64-byte HMAC secret — long enough for every HS tier,
+     * HS512 included (never use in production).
      */
     public static function hmacSecret(): HmacSecret
     {
-        return HmacSecret::fromString('0123456789abcdef0123456789abcdef!');
+        return HmacSecret::fromString(str_repeat('0123456789abcdef', 4));
     }
 
     /**

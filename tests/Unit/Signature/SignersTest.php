@@ -13,10 +13,11 @@ use RoundlyConsulting\Crypto\Signature\Key\OkpKey;
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
 use RoundlyConsulting\Crypto\Signature\KeyLoadException;
 use RoundlyConsulting\Crypto\Signature\Rs;
+use RoundlyConsulting\Crypto\Signature\WeakKeyException;
 
-function strongSecret(): HmacSecret
+function strongSecret(int $bytes = 64): HmacSecret
 {
-    return HmacSecret::fromString('0123456789abcdef0123456789abcdef!');
+    return HmacSecret::fromString(substr(str_repeat('0123456789abcdef!', 8), 0, $bytes));
 }
 
 describe('Hs', function (): void {
@@ -33,6 +34,19 @@ describe('Hs', function (): void {
         'HS384' => [Algorithm::HS384, 48],
         'HS512' => [Algorithm::HS512, 64],
     ]);
+
+    it('requires a key at least as long as the hash, per RFC 7518 §3.2', function (Algorithm $algorithm, int $minimum): void {
+        expect((new Hs(strongSecret($minimum), $algorithm))->algorithm())->toBe($algorithm)
+            ->and(fn (): Hs => new Hs(strongSecret($minimum - 1), $algorithm))
+            ->toThrow(WeakKeyException::class, "at least {$minimum} bytes");
+    })->with([
+        'HS384' => [Algorithm::HS384, 48],
+        'HS512' => [Algorithm::HS512, 64],
+    ]);
+
+    it('keeps the 32-byte floor for HS256', function (): void {
+        expect((new Hs(strongSecret(32)))->algorithm())->toBe(Algorithm::HS256);
+    });
 
     it('rejects construction for a non-HS algorithm', function (Algorithm $algorithm): void {
         new Hs(strongSecret(), $algorithm);

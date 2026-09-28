@@ -51,7 +51,7 @@ it('generates an HMAC secret through the facade without holding it', function ()
 });
 
 it('surfaces the keyed signers through the facade', function (): void {
-    $hs = Crypto::hs(HmacSecret::fromString('0123456789abcdef0123456789abcdef!'), Algorithm::HS384);
+    $hs = Crypto::hs(HmacSecret::fromString(str_repeat('0123456789abcdef', 3)), Algorithm::HS384);
     $rs = Crypto::rs(RsaKey::public(keyPem('rsa-public')), Algorithm::RS512);
     $es = Crypto::es(EcKey::public(keyPem('ec-public')));
     $eddsa = Crypto::eddsa(OkpKey::ed25519(str_repeat("\x01", 32)));

@@ -8,8 +8,8 @@ use RoundlyConsulting\Crypto\Exceptions\CryptoException;
 
 /**
  * Thrown when key material is too weak to use safely: an RSA key under 2048
- * bits, an HMAC secret under 256 bits or with no entropy, or an unsupported
- * curve.
+ * bits, an HMAC secret under 256 bits (or under the hash size for HS384/HS512)
+ * or with no entropy, or an unsupported curve.
  */
 final class WeakKeyException extends CryptoException
 {
@@ -21,6 +21,11 @@ final class WeakKeyException extends CryptoException
     public static function pemAsSecret(): self
     {
         return new self('A PEM-encoded key cannot be used as an HMAC secret.');
+    }
+
+    public static function shortSecretFor(Algorithm $algorithm, int $minimum, int $bytes): self
+    {
+        return new self("The {$algorithm->value} secret must be at least {$minimum} bytes (the hash size, RFC 7518 §3.2); got {$bytes}.");
     }
 
     public static function shortSecret(): self
