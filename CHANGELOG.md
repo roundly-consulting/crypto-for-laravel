@@ -26,4 +26,9 @@ Initial public release.
   filesystem disk or your own config key, plus key generators.
 - A `Crypto` facade fronting the whole toolbox; every primitive also works on its own, with no
   config file and no env keys — keys are always explicit arguments.
+- Facade sub-accessors, so the facade can build every key its own signers take:
+  `Crypto::keys()->rsa()` / `ec()` / `ed25519()` / `hmac()` (load from PEM, disk or your config,
+  generate, or generate-and-persist on first boot), `Crypto::random()` (bytes, URL-safe /
+  numeric / alphanumeric / custom-alphabet tokens, base32 secrets), `Crypto::x509()` (PEM, DER
+  and `x5c` certificates, plus `chain()`) and `Crypto::ecDer()` (ECDSA raw ↔ DER).
 - Testing helpers: ephemeral keys, known OTP vectors and opt-in Pest expectations for your suites.

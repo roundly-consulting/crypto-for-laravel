@@ -115,6 +115,99 @@ methods.
 
 ## Usage
 
+### The `Crypto` facade
+
+`Crypto` fronts the whole toolbox, so typing `Crypto::` shows every entry point. Every factory
+still takes keys and knobs as explicit arguments, and the manager behind it holds no secret.
+
+```php
+use RoundlyConsulting\Crypto\Facades\Crypto;
+use RoundlyConsulting\Crypto\Hash\HashAlgorithm;
+use RoundlyConsulting\Crypto\Signature\Algorithm;
+
+// Keys: every key family the signers take, loaded, generated or bootstrapped
+$rsa    = Crypto::keys()->rsa()->privateFromStorage('local', 'keys/rsa.pem');
+$rsaPub = Crypto::keys()->rsa()->publicFromConfig('jwt.public_key');
+$ec     = Crypto::keys()->ec()->generate('P-384');
+$ed     = Crypto::keys()->ed25519()->public($raw32Bytes);
+$secret = Crypto::keys()->hmac()->fromConfig('services.webhook.secret');
+
+// Signers and JOSE
+$token  = Crypto::jws()->sign(['kid' => 'k1'], ['sub' => 'alice'], Crypto::rs($rsa));
+$claims = Crypto::jws()->verify($token, Crypto::rs($rsaPub), Algorithm::RS256);
+$sig    = Crypto::es($ec)->sign($message);               // raw r‖s, as JOSE wants it
+$der    = Crypto::ecDer()->fromRaw($sig, 48);             // DER, as OpenSSL wants it
+Crypto::verifier()->verify($publicKey, $message, $sig);   // the key picks the algorithm
+
+// Hashing, OTP, JWK, X.509, COSE
+Crypto::hmac(HashAlgorithm::Sha256)->verify($payload, $signature, $webhookKey);
+Crypto::totp(digits: 8)->verify($otpSecret, $code);
+Crypto::jwk($ec)->thumbprint();
+Crypto::x509()->fromPem($pem)->fingerprint();
+Crypto::x509()->chain()->fromX5c($x5c)->isLinked();      // the math — the trust call stays yours
+Crypto::coseKey(Crypto::cbor()->decode($coseBytes));
+
+// Randomness and codecs return the value directly
+$code   = Crypto::random()->numeric(6);
+$apiKey = Crypto::random()->token(40);
+$b64u   = Crypto::base64UrlEncode($bytes);
+```
+
+Every method, by area:
+
+| Area | Methods |
+|---|---|
+| JOSE / JWK | `jws()`, `jwk($key)`, `jwkFromArray($members)`, `jwkFromJson($json)` |
+| Keys | `keys()->rsa()` / `->ec()` / `->ed25519()`: `public()`, `private()`, `generate()`, `publicFromStorage()`, `privateFromStorage()`, `publicFromConfig()`, `privateFromConfig()`, `fromStorageOrGenerate()`; plus `rsa()->fromModulusExponent()` and `ec()->fromCoordinates()` |
+| HMAC secrets | `keys()->hmac()`: `fromString()`, `generate()`, `fromStorage()`, `fromConfig()`, `fromStorageOrGenerate()`; shortcut `generateHmacSecret($bytes)` |
+| Signers | `hs($secret, $alg)`, `rs($key, $alg)`, `es($key)`, `eddsa($key)`, `verifier()` |
+| ECDSA encoding | `ecDer()`: `fromRaw($rawRS, $coordBytes)`, `toRaw($der, $coordBytes)`, `isValid($der)` |
+| X.509 | `x509()`: `fromPem()`, `fromDer()`, `fromBase64()`, `chain()` → `fromX5c()`, `fromPems()`, `fromPemBundle()`, `fromCertificates()`; shortcuts `certificate($pem)`, `chainFromX5c($x5c)`, `chainFromPemBundle($bundle)` |
+| ASN.1 / DER | `derDecoder()` |
+| Hashing | `hmac($alg)`, `digest($alg)`, `constantTimeEquals($known, $user)` |
+| COSE / WebAuthn | `cbor()`, `coseKey($decoded)`, `authenticatorData($bytes)` |
+| OTP | `totp($alg, $digits, $period)`, `hotp($alg, $digits)`, `provisioningUri($secret, $label, $issuer, …)` |
+| CSPRNG | `random()`: `bytes()`, `token()`, `numeric()`, `alphanumeric()`, `fromAlphabet()`, `secret()`; shortcuts `randomBytes()`, `randomToken()`, `randomSecret()` |
+| Codecs | `base64UrlEncode/Decode()`, `base64Encode/Decode()`, `base32Encode/Decode()`, `hexEncode/Decode()` |
+
+The Ed25519 loaders use the same public/private words as RSA and EC: "public" is the raw 32-byte
+key, "private" the 64-byte libsodium secret key. The shortcuts run through the sub-accessors, so
+both spellings are the same code.
+
+### Without the facade
+
+The facade's root is `CryptoManager`, a container singleton. Inject it and you get the same API:
+
+```php
+use RoundlyConsulting\Crypto\CryptoManager;
+
+final class IssueApiToken
+{
+    public function __construct(private CryptoManager $crypto) {}
+
+    public function __invoke(): string
+    {
+        return $this->crypto->random()->token(48);
+    }
+}
+```
+
+Or skip both and call the classes the facade fronts. Each works on its own, and the core
+factories need no container at all: `RsaKey::private($pem)`, `Token::numeric(6)`,
+`Certificate::fromDer($der)`, `new Jws`. The sections below use this form.
+
+There are **no action classes**. Crypto is stateless computation, and the convention lets that kind
+of package expose plain service objects rather than one action per method.
+
+### No `Crypto::fake()`, and why
+
+The facade has nothing to fake: no database, queue, event, mail or HTTP call. Apart from
+randomness and the key loaders, every call is a pure function of its arguments; for random output,
+assert the shape rather than the value. The key loaders read your config or a disk, and
+`fromStorageOrGenerate()` writes on first boot. That goes through Laravel's `Storage`, so
+`Storage::fake('local')` already covers it. For ready-made keys and OTP vectors, see
+[Testing helpers](#testing-helpers-testing).
+
 ### JWS / JOSE (`Jose\Jws`)
 
 Sign and verify a compact JWS. Verification is deliberately strict: it enforces structure, an
@@ -263,6 +356,9 @@ $chain->fingerprints(HashAlgorithm::Sha1);        // leaf → root
 $chain->leaf()->publicKey();
 ```
 
+On the facade: `Crypto::x509()->fromPem()` / `fromDer()` / `fromBase64()`, and
+`Crypto::x509()->chain()->fromX5c()` / `fromPems()` / `fromPemBundle()` / `fromCertificates()`.
+
 Validity is reported as **dates**, with a symmetric clock-skew leeway you own:
 
 ```php
@@ -342,6 +438,9 @@ $alnum  = Token::alphanumeric(24);           // 0-9A-Za-z
 $code   = Token::fromAlphabet('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 10);
 ```
 
+The facade groups the same helpers under `Crypto::random()`: `bytes(32)`, `token(40)`,
+`numeric(6)`, `alphanumeric(24)`, `fromAlphabet($alphabet, 10)` and `secret(32)` (base32, for TOTP).
+
 ### Codecs (`Codec\*`)
 
 ```php
@@ -355,28 +454,6 @@ $bytes   = Base64Url::decode($encoded);      // STRICT: rejects +, /, =, and non
 
 $padded  = Base64::encode($bytes);           // standard padded base64 (+/ alphabet, = padding)
 $bytes   = Base64::decode($padded);          // STRICT: rejects non-canonical / non-alphabet
-```
-
-### Facade
-
-Prefer facades? `Crypto` fronts the whole toolbox for IDE discoverability — codecs, CSPRNG,
-hashing, keyed signers, JOSE, COSE, and OTP. Every factory still takes keys/knobs explicitly and
-the manager holds no secret:
-
-```php
-use RoundlyConsulting\Crypto\Facades\Crypto;
-
-Crypto::jws()->verify($token, $verifier, Algorithm::RS256);
-Crypto::hmac(HashAlgorithm::Sha256)->verify($payload, $sig, $secret);
-Crypto::totp(digits: 8)->verify($secret, $code);
-Crypto::es(EcKey::public($pem));             // keyed signers via the facade
-Crypto::jwk($key)->thumbprint();             // JWK + RFC 7638
-Crypto::jwkFromJson($json)->publicKey();
-Crypto::certificate($pem)->fingerprint();    // X.509
-Crypto::chainFromX5c($x5c)->isLinked();
-Crypto::chainFromPemBundle($bundle)->leaf();
-$t = Crypto::randomToken(40);                // codec/CSPRNG passthroughs return the value
-$b = Crypto::base64UrlEncode($bytes);
 ```
 
 ### Testing helpers (`Testing\*`)
@@ -443,6 +520,12 @@ bytes and PEM-reject, RSA ≥ 2048, EC curve checks, Ed25519 length), and a miss
 missing/empty/non-string config value throws a typed `Signature\KeyLoadException` — never a
 PHP warning.
 
+Each factory below is also on the facade, under `Crypto::keys()`, with the same arguments:
+`Crypto::keys()->rsa()->privateFromStorage('local', 'keys/rsa.pem')`,
+`Crypto::keys()->hmac()->fromStorageOrGenerate('local', 'keys/hmac.key')`, and so on. For
+Ed25519, `OkpKey::ed25519*()` becomes `Crypto::keys()->ed25519()->public*()` and
+`OkpKey::fromSecretKey()` / `secretKeyFrom*()` becomes `->private*()`.
+
 ```php
 use RoundlyConsulting\Crypto\Signature\Key\HmacSecret;
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
@@ -504,8 +587,8 @@ file_put_contents('/etc/app/public.pem', $key->publicPem());
 `privatePem()` throws `KeyLoadException::notPrivate()` on a **public** key, so a verify-only key
 can never be mistaken for signing material.
 
-For discoverability the `Crypto` facade surfaces the new HMAC generator too —
-`Crypto::generateHmacSecret(48)` — returning the secret without ever caching it.
+On the facade, `Crypto::keys()->hmac()->generate(48)` (or its shortcut
+`Crypto::generateHmacSecret(48)`) returns the secret without ever caching it.
 
 ## Wiring your own keyed provider
 
