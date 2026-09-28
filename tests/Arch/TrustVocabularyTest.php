@@ -5,7 +5,9 @@ declare(strict_types=1);
 use RoundlyConsulting\Crypto\Asn1\DerDecoder;
 use RoundlyConsulting\Crypto\Asn1\DerElement;
 use RoundlyConsulting\Crypto\X509\Certificate;
+use RoundlyConsulting\Crypto\X509\Certificates;
 use RoundlyConsulting\Crypto\X509\Chain;
+use RoundlyConsulting\Crypto\X509\Chains;
 use RoundlyConsulting\Crypto\X509\DistinguishedName;
 use RoundlyConsulting\Crypto\X509\Extension;
 use RoundlyConsulting\Crypto\X509\OpenSslX509;
@@ -34,6 +36,10 @@ it('never speaks the vocabulary of trust in the X509 module', function (string $
 })->with([
     Certificate::class,
     Chain::class,
+    // The facade's `x509()` / `x509()->chain()` accessors are the module's front door,
+    // so they are held to the module's vocabulary too.
+    Certificates::class,
+    Chains::class,
     DistinguishedName::class,
     Extension::class,
     OpenSslX509::class,
@@ -43,12 +49,12 @@ it('never speaks the vocabulary of trust in the X509 module', function (string $
     DerElement::class,
 ]);
 
-it('never calls a chain valid', function (): void {
-    foreach ((new ReflectionClass(Chain::class))->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+it('never calls a chain valid', function (string $class): void {
+    foreach ((new ReflectionClass($class))->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
         expect(preg_match('/valid/i', $method->getName()))
-            ->toBe(0, "Chain::{$method->getName()}() implies a ruling the chain cannot make");
+            ->toBe(0, "{$class}::{$method->getName()}() implies a ruling the chain cannot make");
     }
-});
+})->with([Chain::class, Chains::class]);
 
 it('confines the validity vocabulary to the certificate date predicates', function (): void {
     $valid = array_values(array_filter(

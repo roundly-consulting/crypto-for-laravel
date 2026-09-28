@@ -107,6 +107,11 @@ ArchPresets::runtimeRequireIsWhitelisted(__DIR__.'/../../composer.json');
 ArchPresets::noDebuggingLeftovers();
 
 /**
+ * `modelsGoThroughTheFacade` is skipped with cause: crypto has no `Models`, `Concerns` or
+ * `Traits` namespace — no model, no host-facing trait, nothing that could bypass the
+ * manager. (`Signature\Key\ReadsKeyMaterial` is loader plumbing shared by the key
+ * classes, not a trait a host model uses.)
+ *
  * `swappableModelsAreNotFinal` and `modelsResolveThroughSeam` are skipped with cause:
  * crypto ships no Eloquent model, no config file and no `*_model` key, so both halves of
  * each are structurally inert. This is jwt's rejection, on a package with even less
