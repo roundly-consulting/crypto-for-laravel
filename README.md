@@ -349,7 +349,7 @@ use RoundlyConsulting\Crypto\X509\Chain;
 $certificate = Certificate::fromPem($pem);        // also fromDer(), fromBase64() for an x5c entry
 
 $certificate->commonName();                       // 'app.example'
-$certificate->dnsNames();                         // ['app.example', '*.api.example']
+$certificate->dnsNames();                         // ['app.example', '*.api.example'] — SAN dNSNames, read from the DER
 $certificate->fingerprint();                      // lower-case sha256 hex, as openssl emits it
 $certificate->notAfter();                         // CarbonImmutable
 $certificate->publicKey();                        // RsaKey | EcKey — policy-checked
@@ -365,6 +365,11 @@ $chain->leaf()->publicKey();
 
 On the facade: `Crypto::x509()->fromPem()` / `fromDer()` / `fromBase64()`, and
 `Crypto::x509()->chain()->fromX5c()` / `fromPems()` / `fromPemBundle()` / `fromCertificates()`.
+
+`fromDer()` / `fromBase64()` take **exactly one** certificate: bytes after it are refused, so two
+different `x5c` strings can never be the same certificate. `dnsNames()` walks the
+subjectAltName `GeneralNames` in the DER and returns each dNSName verbatim — never OpenSSL's
+comma-joined text, where one name containing `, DNS:victim.example` would read as two.
 
 Validity is reported as **dates**, with a symmetric clock-skew leeway you own:
 
