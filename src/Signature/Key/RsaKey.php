@@ -43,13 +43,13 @@ final readonly class RsaKey implements PublicKey
     ) {}
 
     /**
-     * Load an RSA public key from PEM.
+     * Load an RSA public key from PEM text — never a `file://` path.
      *
      * @throws KeyLoadException|WeakKeyException
      */
     public static function public(string $pem): self
     {
-        $key = openssl_pkey_get_public($pem);
+        $key = OpenSsl::isPemText($pem) ? openssl_pkey_get_public($pem) : false;
 
         if ($key === false) {
             OpenSsl::drainErrors();
@@ -63,13 +63,13 @@ final readonly class RsaKey implements PublicKey
     }
 
     /**
-     * Load an RSA private key from PEM.
+     * Load an RSA private key from PEM text — never a `file://` path.
      *
      * @throws KeyLoadException|WeakKeyException
      */
     public static function private(#[SensitiveParameter] string $pem): self
     {
-        $key = openssl_pkey_get_private($pem);
+        $key = OpenSsl::isPemText($pem) ? openssl_pkey_get_private($pem) : false;
 
         if ($key === false) {
             OpenSsl::drainErrors();

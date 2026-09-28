@@ -22,11 +22,13 @@ use RoundlyConsulting\Crypto\Signature\OpenSsl;
 final class OpenSslX509
 {
     /**
+     * PEM text only — never a `file://` path (see {@see OpenSsl::isPemText()}).
+     *
      * @throws MalformedCertificateException
      */
     public static function read(string $pem): OpenSSLCertificate
     {
-        $certificate = @openssl_x509_read($pem);
+        $certificate = OpenSsl::isPemText($pem) ? @openssl_x509_read($pem) : false;
 
         if ($certificate === false) {
             OpenSsl::drainErrors();

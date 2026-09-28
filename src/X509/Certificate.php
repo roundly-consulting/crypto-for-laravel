@@ -62,6 +62,8 @@ final readonly class Certificate
     ) {}
 
     /**
+     * PEM text — never a `file://` path, which OpenSSL would read from disk.
+     *
      * @throws MalformedCertificateException
      */
     public static function fromPem(string $pem): self

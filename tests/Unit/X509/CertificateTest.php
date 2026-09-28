@@ -12,6 +12,7 @@ use RoundlyConsulting\Crypto\Signature\WeakKeyException;
 use RoundlyConsulting\Crypto\Testing\TestCertificates;
 use RoundlyConsulting\Crypto\Testing\TestLeafOptions;
 use RoundlyConsulting\Crypto\X509\Certificate;
+use RoundlyConsulting\Crypto\X509\Chain;
 use RoundlyConsulting\Crypto\X509\DistinguishedName;
 use RoundlyConsulting\Crypto\X509\InvalidLeewayException;
 use RoundlyConsulting\Crypto\X509\MalformedCertificateException;
@@ -318,6 +319,31 @@ it('rejects malformed certificate input with a typed exception', function (strin
     'valid header, corrupt body' => ["-----BEGIN CERTIFICATE-----\nQUJDREVGRw==\n-----END CERTIFICATE-----\n"],
     'a key, not a cert' => ["-----BEGIN PUBLIC KEY-----\nQUJD\n-----END PUBLIC KEY-----\n"],
 ]);
+
+it('never reads a file:// path handed in as PEM', function (): void {
+    // openssl_x509_read() treats a "file://" string as a PATH. A host passing an
+    // untrusted "PEM" (a forwarded client-cert header, say) must not be able to
+    // make this package read its filesystem.
+    $path = tempnam(sys_get_temp_dir(), 'crypto-pem-');
+    file_put_contents($path, TestCertificates::selfSigned()->leaf()->pem());
+
+    try {
+        expect(fn (): Certificate => Certificate::fromPem('file://'.$path))
+            ->toThrow(MalformedCertificateException::class, 'not valid PEM')
+            ->and(fn (): Chain => Chain::fromPems(['file://'.$path]))
+            ->toThrow(MalformedCertificateException::class, 'not valid PEM');
+    } finally {
+        @unlink($path);
+    }
+});
+
+it('still reads a PEM behind preamble lines, as openssl does', function (): void {
+    // `openssl pkcs12` writes "Bag Attributes" lines ahead of the boundary.
+    $pem = TestCertificates::selfSigned()->leaf()->pem();
+
+    expect(Certificate::fromPem("Bag Attributes\n    localKeyID: 01\n".$pem)->der())
+        ->toBe(Certificate::fromPem($pem)->der());
+});
 
 it('rejects a DER that is not a certificate', function (): void {
     expect(fn (): Certificate => Certificate::fromDer(random_bytes(64)))

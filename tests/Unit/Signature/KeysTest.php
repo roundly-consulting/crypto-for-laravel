@@ -116,6 +116,17 @@ describe('RsaKey', function (): void {
         RsaKey::public('not a pem');
     })->throws(KeyLoadException::class);
 
+    it('never reads a file:// path handed in as a PEM', function (string $method, string $fixture): void {
+        // openssl_pkey_get_*() treat a "file://" string as a PATH to read.
+        $path = realpath(__DIR__.'/../../Fixtures/keys/'.$fixture.'.pem');
+
+        expect(fn (): mixed => RsaKey::{$method}('file://'.$path))
+            ->toThrow(KeyLoadException::class, 'could not be read');
+    })->with([
+        'public' => ['public', 'rsa-public'],
+        'private' => ['private', 'rsa-private'],
+    ]);
+
     it('rejects an EC PEM loaded as RSA', function (): void {
         RsaKey::public(keyPem('ec-public'));
     })->throws(KeyLoadException::class);
@@ -146,6 +157,20 @@ describe('EcKey', function (): void {
     it('loads a public and private PEM', function (): void {
         expect(EcKey::public(keyPem('ec-public'))->algorithm())->toBe(Algorithm::ES256)
             ->and(EcKey::private(keyPem('ec-private'))->isPrivate)->toBeTrue();
+    });
+
+    it('never reads a file:// path handed in as a PEM', function (string $method, string $fixture): void {
+        $path = realpath(__DIR__.'/../../Fixtures/keys/'.$fixture.'.pem');
+
+        expect(fn (): mixed => EcKey::{$method}('file://'.$path))
+            ->toThrow(KeyLoadException::class, 'could not be read');
+    })->with([
+        'public' => ['public', 'ec-public'],
+        'private' => ['private', 'ec-private'],
+    ]);
+
+    it('still reads a PEM behind preamble lines, as openssl does', function (): void {
+        expect(EcKey::public("Bag Attributes\n\n".keyPem('ec-public'))->algorithm())->toBe(Algorithm::ES256);
     });
 
     it('builds a key from raw P-256 coordinates', function (): void {

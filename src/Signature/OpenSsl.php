@@ -94,6 +94,21 @@ final class OpenSsl
     }
 
     /**
+     * Whether a string is PEM TEXT — never a path. PHP's `openssl_*` functions
+     * read a string starting with `file://` as a PATH and load that file, so a
+     * "PEM" that may be untrusted (a forwarded client-certificate header, say)
+     * could otherwise make this package read the local filesystem. PEM text
+     * always carries a `-----BEGIN ` boundary, and OpenSSL tolerates preamble
+     * lines ahead of it (`openssl pkcs12` writes "Bag Attributes"), so the test
+     * is that boundary — plus the path prefix itself, since a file name could
+     * smuggle a boundary in.
+     */
+    public static function isPemText(string $input): bool
+    {
+        return ! str_starts_with($input, 'file://') && str_contains($input, '-----BEGIN ');
+    }
+
+    /**
      * Empty the OpenSSL error queue so a later, unrelated call isn't blamed for
      * an error raised (and already handled) here.
      */

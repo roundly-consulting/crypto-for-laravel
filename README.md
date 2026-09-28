@@ -529,6 +529,10 @@ bytes and PEM-reject, RSA ≥ 2048, EC curve checks, Ed25519 length), and a miss
 missing/empty/non-string config value throws a typed `Signature\KeyLoadException` — never a
 PHP warning.
 
+The PEM factories — `RsaKey`/`EcKey` `public()`/`private()`, `Certificate::fromPem()`,
+`Chain::fromPems()` — take PEM **text**, never a path: a `file://…` string (which PHP's OpenSSL
+functions would read from disk) is refused as unreadable. Load files through `fromStorage()`.
+
 Each factory below is also on the facade, under `Crypto::keys()`, with the same arguments:
 `Crypto::keys()->rsa()->privateFromStorage('local', 'keys/rsa.pem')`,
 `Crypto::keys()->hmac()->fromStorageOrGenerate('local', 'keys/hmac.key')`, and so on. For

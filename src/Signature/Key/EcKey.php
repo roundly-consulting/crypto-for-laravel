@@ -57,13 +57,13 @@ final readonly class EcKey implements PublicKey
     ) {}
 
     /**
-     * Load an EC public key from PEM.
+     * Load an EC public key from PEM text — never a `file://` path.
      *
      * @throws KeyLoadException
      */
     public static function public(string $pem): self
     {
-        $key = openssl_pkey_get_public($pem);
+        $key = OpenSsl::isPemText($pem) ? openssl_pkey_get_public($pem) : false;
 
         if ($key === false) {
             OpenSsl::drainErrors();
@@ -75,13 +75,13 @@ final readonly class EcKey implements PublicKey
     }
 
     /**
-     * Load an EC private key from PEM.
+     * Load an EC private key from PEM text — never a `file://` path.
      *
      * @throws KeyLoadException
      */
     public static function private(#[SensitiveParameter] string $pem): self
     {
-        $key = openssl_pkey_get_private($pem);
+        $key = OpenSsl::isPemText($pem) ? openssl_pkey_get_private($pem) : false;
 
         if ($key === false) {
             OpenSsl::drainErrors();
