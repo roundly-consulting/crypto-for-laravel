@@ -52,6 +52,19 @@ final readonly class Es implements Signer, Verifier
 
         $der = Der::fromRaw($signature, $coordinateBytes);
 
-        return OpenSsl::verify($message, $der, $this->key->key, $this->algorithm()->opensslAlgorithm());
+        return OpenSsl::verify($message, $der, $this->publicKey()->key, $this->algorithm()->opensslAlgorithm());
+    }
+
+    /**
+     * The key to verify with. ext-openssl will not verify with a private-key
+     * handle — it cannot coerce one into the public key `openssl_verify` needs,
+     * so the check fails closed — so a private key verifies through its derived
+     * public half, the way an EdDSA key always carries one.
+     *
+     * @throws KeyLoadException when the public half cannot be derived
+     */
+    private function publicKey(): EcKey
+    {
+        return $this->key->isPrivate ? EcKey::public($this->key->publicPem()) : $this->key;
     }
 }

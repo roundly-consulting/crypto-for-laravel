@@ -81,6 +81,9 @@ final class OpenSsl
      * Verify a signature. The signature is attacker-controlled, so a malformed
      * one fails quietly rather than surfacing a PHP warning; only an exact 1
      * passes.
+     *
+     * The key must be a PUBLIC-key handle: ext-openssl refuses a private one
+     * here, and that refusal is indistinguishable from a bad signature.
      */
     public static function verify(string $message, string $signature, OpenSSLAsymmetricKey $key, int $algorithm): bool
     {

@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 use RoundlyConsulting\Crypto\Cose\CoseKey;
 use RoundlyConsulting\Crypto\Signature\Ec\Der;
+use RoundlyConsulting\Crypto\Signature\Es;
 use RoundlyConsulting\Crypto\Signature\Key\EcKey;
+use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
 use RoundlyConsulting\Crypto\Signature\KeyVerifier;
+use RoundlyConsulting\Crypto\Signature\Rs;
 
 it('verifies an ES256 signature in DER form (WebAuthn)', function (): void {
     $es256 = cryptoVectors()['es256'];
@@ -73,3 +76,17 @@ it('verifies an EdDSA signature', function (): void {
 
     expect((new KeyVerifier)->verify($key, hex2bin($eddsa['message']), hex2bin($eddsa['sig'])))->toBeTrue();
 })->skip(fn (): bool => ! function_exists('sodium_crypto_sign_verify_detached'), 'ext-sodium not loaded');
+
+it('verifies with a private key the same as with its public half', function (): void {
+    $ec = EcKey::private(keyPem('ec-private'));
+    $esRaw = (new Es($ec))->sign('message');
+    $rsa = RsaKey::private(keyPem('rsa-private'));
+    $rs = (new Rs($rsa))->sign('message');
+    $verifier = new KeyVerifier;
+
+    expect($verifier->verify($ec, 'message', $esRaw))->toBeTrue()
+        ->and($verifier->verify($ec, 'message', Der::fromRaw($esRaw, 32)))->toBeTrue()
+        ->and($verifier->verify($ec, 'tampered', $esRaw))->toBeFalse()
+        ->and($verifier->verify($rsa, 'message', $rs))->toBeTrue()
+        ->and($verifier->verify($rsa, 'tampered', $rs))->toBeFalse();
+});

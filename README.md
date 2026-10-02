@@ -249,6 +249,9 @@ $es = $jws->sign([], ['sub' => 'kim'], new Es(EcKey::private($p521Pem)));
 $jws->verify($es, new Es(EcKey::public($p521PublicPem)), Algorithm::ES512);
 ```
 
+A signer built from a private key verifies too (it checks against the derived public half), so a
+service that issues and checks its own tokens can pass the same `Rs`/`Es` instance to both calls.
+
 EdDSA (Ed25519) can both sign and verify when `ext-sodium` is present:
 
 ```php

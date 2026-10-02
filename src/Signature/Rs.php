@@ -42,7 +42,20 @@ final readonly class Rs implements Signer, Verifier
 
     public function verify(string $message, string $signature): bool
     {
-        return OpenSsl::verify($message, $signature, $this->key->key, $this->algorithm->opensslAlgorithm());
+        return OpenSsl::verify($message, $signature, $this->publicKey()->key, $this->algorithm->opensslAlgorithm());
+    }
+
+    /**
+     * The key to verify with. ext-openssl will not verify with a private-key
+     * handle — it cannot coerce one into the public key `openssl_verify` needs,
+     * so the check fails closed — so a private key verifies through its derived
+     * public half, the way an EdDSA key always carries one.
+     *
+     * @throws KeyLoadException|WeakKeyException when the public half cannot be derived
+     */
+    private function publicKey(): RsaKey
+    {
+        return $this->key->isPrivate ? RsaKey::public($this->key->publicPem()) : $this->key;
     }
 
     private static function isRsaAlgorithm(Algorithm $algorithm): bool

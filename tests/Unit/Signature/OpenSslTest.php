@@ -32,3 +32,14 @@ it('drains the error queue and returns false for a malformed signature', functio
     expect(OpenSsl::verify('message', str_repeat("\xff", 70), $public->key, OPENSSL_ALGO_SHA256))->toBeFalse()
         ->and(openssl_error_string())->toBeFalse();
 });
+
+it('fails closed, without a warning, when handed a private-key handle', function (): void {
+    // The root cause the signers work around: ext-openssl cannot coerce a
+    // private-key handle into the public key openssl_verify needs, so a valid
+    // signature reads as invalid. Es and Rs verify through the public half.
+    $private = EcKey::private(keyPem('ec-private'));
+    $signature = OpenSsl::sign('message', $private->key, OPENSSL_ALGO_SHA256);
+
+    expect(OpenSsl::verify('message', $signature, $private->key, OPENSSL_ALGO_SHA256))->toBeFalse()
+        ->and(OpenSsl::verify('message', $signature, EcKey::public($private->publicPem())->key, OPENSSL_ALGO_SHA256))->toBeTrue();
+});

@@ -147,6 +147,60 @@ describe('Es', function (): void {
     });
 });
 
+describe('verifying with a private key', function (): void {
+    // ext-openssl refuses a private-key handle where verification needs a public
+    // key, so these pin that every asymmetric signer verifies its own output —
+    // the way EdDSA always has — and still agrees with the public-key verifier.
+
+    it('verifies its own ES signature on every curve', function (Closure $load, Algorithm $algorithm, int $length): void {
+        $key = $load();
+        $signer = new Es($key);
+        $sig = $signer->sign('message');
+        $foreign = (new Es(EcKey::generate($key->curve)))->sign('message');
+
+        expect($signer->algorithm())->toBe($algorithm)
+            ->and(strlen($sig))->toBe($length)
+            ->and($signer->verify('message', $sig))->toBeTrue()
+            ->and((new Es(EcKey::public($key->publicPem())))->verify('message', $sig))->toBeTrue()
+            ->and($signer->verify('tampered', $sig))->toBeFalse()
+            ->and($signer->verify('message', $foreign))->toBeFalse()
+            ->and($signer->verify('message', 'short'))->toBeFalse();
+    })->with([
+        'ES256 (PEM)' => [fn (): EcKey => EcKey::private(keyPem('ec-private')), Algorithm::ES256, 64],
+        'ES256' => [fn (): EcKey => EcKey::generate('P-256'), Algorithm::ES256, 64],
+        'ES384' => [fn (): EcKey => EcKey::generate('P-384'), Algorithm::ES384, 96],
+        'ES512' => [fn (): EcKey => EcKey::generate('P-521'), Algorithm::ES512, 132],
+    ]);
+
+    it('verifies its own RS signature on every tier', function (Algorithm $algorithm): void {
+        $signer = new Rs(RsaKey::private(keyPem('rsa-private')), $algorithm);
+        $sig = $signer->sign('message');
+        $foreign = (new Rs(RsaKey::generate(), $algorithm))->sign('message');
+
+        expect($signer->verify('message', $sig))->toBeTrue()
+            ->and((new Rs(RsaKey::public(keyPem('rsa-public')), $algorithm))->verify('message', $sig))->toBeTrue()
+            ->and($signer->verify('tampered', $sig))->toBeFalse()
+            ->and($signer->verify('message', $foreign))->toBeFalse()
+            ->and($signer->verify('message', 'garbage'))->toBeFalse();
+    })->with([
+        'RS256' => [Algorithm::RS256],
+        'RS384' => [Algorithm::RS384],
+        'RS512' => [Algorithm::RS512],
+    ]);
+
+    it('verifies its own EdDSA signature', function (): void {
+        $key = OkpKey::generate();
+        $signer = new EdDSA($key);
+        $sig = $signer->sign('message');
+        $foreign = (new EdDSA(OkpKey::generate()))->sign('message');
+
+        expect($signer->verify('message', $sig))->toBeTrue()
+            ->and((new EdDSA(OkpKey::ed25519($key->publicKey)))->verify('message', $sig))->toBeTrue()
+            ->and($signer->verify('tampered', $sig))->toBeFalse()
+            ->and($signer->verify('message', $foreign))->toBeFalse();
+    })->skip(fn (): bool => ! function_exists('sodium_crypto_sign_verify_detached'), 'ext-sodium not loaded');
+});
+
 describe('EdDSA', function (): void {
     it('verifies the committed Ed25519 vector', function (): void {
         $eddsa = cryptoVectors()['eddsa'];
