@@ -12,6 +12,9 @@ never a runtime dependency.
   - `ecdsa_secp256r1_sha256.json` — ECDSA P-256 / SHA-256 verify (484 tests)
   - `rsa_signature_2048_sha256.json` — RSA PKCS#1 v1.5 2048-bit / SHA-256 verify (259 tests)
   - `ed25519.json` — Ed25519 verify (150 tests)
+  - `aes_gcm_test.json` — AES-GCM (316 tests; fetched 2026-10-03), asserted by
+    `tests/Unit/Aead/Aes256GcmTest.php`: the AES-256 / 96-bit nonce / 128-bit tag group
+    (39 valid, 27 invalid) — the only key and nonce size the package exposes
 
 Regeneration is a manual, documented one-off: re-download the same paths from upstream.
 

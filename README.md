@@ -36,6 +36,8 @@ pulling in anything else.
 - **WebAuthn** COSE key parsing (P-256/P-384/P-521, RSA, Ed25519), a minimal defensive CBOR
   decoder, and signature verification.
 - **HMAC** sign/verify, deterministic digests (with optional pepper), and constant-time compares.
+- **Authenticated encryption** (RFC 5116 `AEAD_AES_256_GCM`): encrypt with associated data that
+  binds a ciphertext to its context, so it never opens anywhere else.
 - **CSPRNG** random bytes, URL-safe / numeric / alphanumeric tokens, and base32 secrets.
 - **Codecs**: strict base64url, standard padded base64, base32 (RFC 4648), and hex.
 - **Testing helpers**: ready-made ephemeral keys and known OTP vectors for consumer suites,
@@ -43,7 +45,8 @@ pulling in anything else.
 - **Zero-config**: no config file, no env keys — every key and knob is an explicit argument.
 
 Parity with the RFCs and specs is proven by **committed test vectors** (RFC 4226 Appendix D,
-RFC 6238 Appendix B, RFC 4231 HMAC-SHA384/512, RFC 7515 Appendix A.1/A.2, RFC 4648, and static
+RFC 6238 Appendix B, RFC 4231 HMAC-SHA384/512, RFC 7515 Appendix A.1/A.2, RFC 4648, the GCM
+specification's AES-256 cases and Wycheproof's AES-256-GCM corpus, and static
 ES256/384/512 / RS256 / EdDSA COSE fixtures) — no external JOSE/JWT/TOTP/WebAuthn/CBOR library
 is a dependency.
 
@@ -167,6 +170,7 @@ Every method, by area:
 | X.509 | `x509()`: `fromPem()`, `fromDer()`, `fromBase64()`, `chain()` → `fromX5c()`, `fromPems()`, `fromPemBundle()`, `fromCertificates()`; shortcuts `certificate($pem)`, `chainFromX5c($x5c)`, `chainFromPemBundle($bundle)` |
 | ASN.1 / DER | `derDecoder()` |
 | Hashing | `hmac($alg)`, `digest($alg)`, `constantTimeEquals($known, $user)` |
+| Authenticated encryption | `aes256Gcm()`: `seal()`, `open()`, `encrypt()`, `decrypt()` |
 | COSE / WebAuthn | `cbor()`, `coseKey($coseBytes)`, `authenticatorData($bytes)` |
 | OTP | `totp($alg, $digits, $period)`, `hotp($alg, $digits)`, `provisioningUri($secret, $label, $issuer, …)` |
 | CSPRNG | `random()`: `bytes()`, `token()`, `numeric()`, `alphanumeric()`, `fromAlphabet()`, `secret()`; shortcuts `randomBytes()`, `randomToken()`, `randomSecret()` |
@@ -285,6 +289,37 @@ $ok = hash_equals($expected, $request->header('X-Hub-Signature-256', ''));
 // Or verify raw signatures directly (constant-time):
 $ok = $hmac->verify($payload, $signature, $webhookSecret);
 ```
+
+### Authenticated encryption (`Aead\Aes256Gcm`)
+
+`AEAD_AES_256_GCM` (RFC 5116 §5.2): a 32-byte key, a 12-byte nonce, a 16-byte tag. The
+associated data is authenticated but not encrypted — put in it whatever the ciphertext must
+stay bound to (a purpose, a record's identity), and a ciphertext copied anywhere else fails to
+open.
+
+```php
+use RoundlyConsulting\Crypto\Aead\Aes256Gcm;
+use RoundlyConsulting\Crypto\Aead\DecryptionFailedException;
+
+$aead = new Aes256Gcm; // or Crypto::aes256Gcm()
+
+// A fresh random nonce, carried in front: nonce ‖ ciphertext ‖ tag.
+$sealed = $aead->seal($key, $plaintext, associatedData: 'invoices:42');
+
+try {
+    $plaintext = $aead->open($key, $sealed, associatedData: 'invoices:42');
+} catch (DecryptionFailedException) {
+    // wrong key or context, or a changed ciphertext — one message for every cause
+}
+
+// The RFC 5116 interface, with your own nonce (never reuse one under a key):
+$ciphertext = $aead->encrypt($key, $nonce, $plaintext, $associatedData); // ciphertext ‖ tag
+$plaintext = $aead->decrypt($key, $nonce, $ciphertext, $associatedData);
+```
+
+A wrong-length key or nonce throws `Aead\InvalidAeadParameterException`. With random nonces,
+keep one key below 2³² seals (NIST SP 800-38D §8.3) — derive a key per purpose rather than
+sharing one.
 
 ### TOTP / HOTP (`Otp\Totp`, `Otp\Hotp`)
 
@@ -664,7 +699,8 @@ $this->app->singleton(Hs::class, fn () => new Hs(
 
 Everything throws a subtype of `RoundlyConsulting\Crypto\Exceptions\CryptoException`, so you can
 catch broadly or precisely and re-wrap at your boundary — e.g.
-`Codec\InvalidEncodingException`, `Signature\InvalidSignatureException`,
+`Codec\InvalidEncodingException`, `Aead\DecryptionFailedException`,
+`Aead\InvalidAeadParameterException`, `Signature\InvalidSignatureException`,
 `Signature\AlgorithmMismatchException`, `Signature\WeakKeyException`,
 `Jose\MalformedTokenException`, `Jose\MalformedJwkException`, `Cose\MalformedCborException`,
 `Cose\UnsupportedAlgorithmException`, `Otp\InvalidOtpParameterException`, and — for X.509 —

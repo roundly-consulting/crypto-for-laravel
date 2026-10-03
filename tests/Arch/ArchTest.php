@@ -48,6 +48,7 @@ ArchPresets::finalByDefault('RoundlyConsulting\Crypto', [
  *
  * Exempted (they legitimately implement the primitives — that is their entire job):
  *
+ *   - Aead\        — Aes256Gcm (openssl_encrypt / openssl_decrypt ARE the AEAD)
  *   - Hash\        — Digest, Hmac, HashAlgorithm, ConstantTime (hash, hash_hmac, hash_equals)
  *   - Signature\   — the OpenSsl gateway, Algorithm/Hs/EdDSA, and the Key\* loaders
  *   - Codec\       — Base64, Base64Url (base64_encode/decode ARE the codec)
@@ -83,6 +84,7 @@ ArchPresets::finalByDefault('RoundlyConsulting\Crypto', [
  * implementing primitives is their job.
  */
 ArchPresets::noLocalCryptoPrimitives('RoundlyConsulting\Crypto', [
+    'RoundlyConsulting\Crypto\Aead',
     'RoundlyConsulting\Crypto\Hash',
     'RoundlyConsulting\Crypto\Signature',
     'RoundlyConsulting\Crypto\Codec',

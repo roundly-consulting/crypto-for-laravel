@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Crypto;
 
+use RoundlyConsulting\Crypto\Aead\Aes256Gcm;
 use RoundlyConsulting\Crypto\Asn1\DerDecoder;
 use RoundlyConsulting\Crypto\Codec\Base32;
 use RoundlyConsulting\Crypto\Codec\Base64;
@@ -49,7 +50,8 @@ use SensitiveParameter;
  * A discoverability front for the package's whole toolbox.
  *
  * Fronted by the {@see Facades\Crypto} facade so that typing `Crypto::` reveals
- * every entry point — codecs, CSPRNG, hashing, signers, JOSE, COSE, and OTP.
+ * every entry point — codecs, CSPRNG, hashing, authenticated encryption, signers,
+ * JOSE, COSE, and OTP.
  * Every helper takes key material and knobs as explicit arguments; this manager
  * reads no config of its own and holds no secret. The purely-static codecs and
  * CSPRNG are surfaced as passthroughs returning the computed value; stateful
@@ -159,6 +161,13 @@ final class CryptoManager
     public function derDecoder(): DerDecoder
     {
         return new DerDecoder;
+    }
+
+    // ── Authenticated encryption (RFC 5116) ─────────────────────────────────
+
+    public function aes256Gcm(): Aes256Gcm
+    {
+        return new Aes256Gcm;
     }
 
     // ── Hashing ─────────────────────────────────────────────────────────────

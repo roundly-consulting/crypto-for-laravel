@@ -20,6 +20,9 @@ Initial public release.
   signature verification.
 - HMAC signing and verification, deterministic digests with an optional pepper, and
   constant-time comparisons.
+- Authenticated encryption, RFC 5116 `AEAD_AES_256_GCM` (`Aead\Aes256Gcm`, `Crypto::aes256Gcm()`):
+  associated data binds a ciphertext to its context; proven against the GCM specification's
+  AES-256 vectors and Wycheproof's AES-256-GCM corpus.
 - CSPRNG helpers for random bytes, URL-safe / numeric / alphanumeric tokens and base32 secrets.
 - Strict codecs: base64url, standard padded base64, base32 and hex.
 - Key classes (`HmacSecret`, `RsaKey`, `EcKey`, `OkpKey`) with validated loaders from a
