@@ -45,7 +45,7 @@ final class KeyLoadException extends CryptoException
 
     public static function missingConfig(string $key): self
     {
-        return new self("Config key [{$key}] holds no key material (missing, empty, or not a string).");
+        return new self("Config key [{$key}] holds no key material (missing, blank, or not a string).");
     }
 
     public static function generationFailed(): self

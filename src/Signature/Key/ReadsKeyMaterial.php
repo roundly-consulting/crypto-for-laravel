@@ -49,14 +49,16 @@ trait ReadsKeyMaterial
     }
 
     /**
-     * Assert a value read from the consumer's config is a usable, non-empty
-     * string. This never calls `config()`; the read lives in the factory.
+     * Assert a value read from the consumer's config is a usable string. A blank
+     * value (`''` or whitespace, what a host's `KEY=` gives) is not set, so it is
+     * missing like an absent one. This never calls `config()`; the read lives in
+     * the factory.
      *
-     * @throws KeyLoadException when the config value is missing, empty, or not a string
+     * @throws KeyLoadException when the config value is missing, blank, or not a string
      */
     protected static function requireConfigString(string $key, mixed $value): string
     {
-        if (! is_string($value) || $value === '') {
+        if (! is_string($value) || trim($value) === '') {
             throw KeyLoadException::missingConfig($key);
         }
 

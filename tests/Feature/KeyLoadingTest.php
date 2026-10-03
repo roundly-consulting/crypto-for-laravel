@@ -62,11 +62,12 @@ describe('HmacSecret loading', function (): void {
         HmacSecret::fromConfig('services.webhook.missing');
     })->throws(KeyLoadException::class);
 
-    it('throws when the config value is empty', function (): void {
-        config(['services.webhook.secret' => '']);
+    it('throws when the config value is blank, as not set (strict config)', function (string $blank): void {
+        config(['services.webhook.secret' => $blank]);
 
         HmacSecret::fromConfig('services.webhook.secret');
-    })->throws(KeyLoadException::class);
+    })->with(['empty' => [''], 'whitespace' => [str_repeat(' ', 40)]])
+        ->throws(KeyLoadException::class, 'holds no key material (missing, blank, or not a string)');
 
     it('throws when the config value is not a string', function (): void {
         config(['services.webhook.secret' => 1234]);

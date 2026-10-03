@@ -47,7 +47,7 @@ final readonly class HmacSecrets
     /**
      * Reads YOUR config key — the package has none of its own.
      *
-     * @throws KeyLoadException when the config value is missing, empty, or not a string
+     * @throws KeyLoadException when the config value is missing, blank, or not a string
      * @throws WeakKeyException when the configured secret fails the strength guards
      */
     public function fromConfig(string $key): HmacSecret

@@ -112,7 +112,7 @@ final class HmacSecret
     /**
      * Load a secret from the consumer's own config key.
      *
-     * @throws KeyLoadException when the config value is missing, empty, or not a string
+     * @throws KeyLoadException when the config value is missing, blank, or not a string
      * @throws WeakKeyException when the configured secret fails the strength guards
      */
     public static function fromConfig(string $key): self
