@@ -609,7 +609,7 @@ from your own config key, plus **generators** so you never have to hand-roll a C
 Every loader validates with the exact same guards as the core factory (HMAC ≥ 32 random
 bytes and PEM-reject, RSA ≥ 2048, EC curve checks, Ed25519 length), and a missing file (whether
 the disk returns `null` or is configured with `'throw' => true`), an unknown disk name, a
-failed write in `fromStorageOrGenerate()`, or a missing/empty/non-string config value throws a
+failed write in `fromStorageOrGenerate()`, or a missing/blank/non-string config value throws a
 typed `Signature\KeyLoadException` — never a PHP warning, and never a filesystem exception
 (the original stays on `getPrevious()`).
 
