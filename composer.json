@@ -1,6 +1,6 @@
 {
     "name": "roundly-consulting/crypto-for-laravel",
-    "description": "Native, audited cryptographic and encoding primitives for Laravel: JWS/JOSE, TOTP/HOTP, WebAuthn signature verification, HMAC, CSPRNG tokens, and codecs — zero-config, à la carte.",
+    "description": "Native, audited cryptographic and encoding primitives for Laravel: JWS/JOSE, TOTP/HOTP, WebAuthn signature verification, HMAC, authenticated encryption (AES-256-GCM), CSPRNG tokens, and codecs — zero-config, à la carte.",
     "keywords": [
         "roundly-consulting",
         "laravel",
@@ -12,6 +12,9 @@
         "webauthn",
         "cose",
         "hmac",
+        "encryption",
+        "aead",
+        "aes-256-gcm",
         "base64url"
     ],
     "homepage": "https://github.com/roundly-consulting/crypto-for-laravel",
