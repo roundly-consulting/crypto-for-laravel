@@ -20,10 +20,11 @@
 # Cryptographic Primitives for Laravel
 
 Native, audited cryptographic and encoding primitives for Laravel — JWS/JOSE, TOTP/HOTP,
-WebAuthn signature verification, HMAC, CSPRNG tokens, and codecs — with **zero third-party
-crypto dependencies**. Every primitive is usable **à la carte**: reach for `Hmac` alone to
-check a webhook, `Jws` alone for tokens, or `Totp` alone for one-time passwords, without
-pulling in anything else.
+WebAuthn signature verification, HMAC, authenticated encryption (AES-256-GCM), CSPRNG tokens,
+and codecs — with **zero third-party crypto dependencies**. Every primitive is usable
+**à la carte**: reach for `Hmac` alone to check a webhook, `Jws` alone for tokens,
+`Aes256Gcm` alone to encrypt a value, or `Totp` alone for one-time passwords, without pulling
+in anything else.
 
 - **JOSE / JWS** compact and flattened signing + strict verification across the whole SHA-2
   tier (HS256/384/512, RS256/384/512, ES256/384/512) plus EdDSA (Ed25519).
@@ -144,8 +145,9 @@ $sig    = Crypto::es($ec)->sign($message);               // raw r‖s, as JOSE w
 $der    = Crypto::ecDer()->fromRaw($sig, 48);             // DER, as OpenSSL wants it
 Crypto::verifier()->verify($publicKey, $message, $sig);   // the key picks the algorithm
 
-// Hashing, OTP, JWK, X.509, COSE
+// Hashing, encryption, OTP, JWK, X.509, COSE
 Crypto::hmac(HashAlgorithm::Sha256)->verify($payload, $signature, $webhookKey);
+$sealed = Crypto::aes256Gcm()->seal($dataKey, $plaintext, associatedData: 'invoices:42');
 Crypto::totp(digits: 8)->verify($otpSecret, $code);
 Crypto::jwk($ec)->thumbprint();
 Crypto::x509()->fromPem($pem)->fingerprint();
@@ -292,7 +294,8 @@ $ok = $hmac->verify($payload, $signature, $webhookSecret);
 
 ### Authenticated encryption (`Aead\Aes256Gcm`)
 
-`AEAD_AES_256_GCM` (RFC 5116 §5.2): a 32-byte key, a 12-byte nonce, a 16-byte tag. The
+`AEAD_AES_256_GCM` (RFC 5116 §5.2): a 32-byte key, a 12-byte nonce, a 16-byte tag — the
+constants `Aes256Gcm::KEY_BYTES`, `Aes256Gcm::NONCE_BYTES` and `Aes256Gcm::TAG_BYTES`. The
 associated data is authenticated but not encrypted — put in it whatever the ciphertext must
 stay bound to (a purpose, a record's identity), and a ciphertext copied anywhere else fails to
 open.
@@ -300,6 +303,10 @@ open.
 ```php
 use RoundlyConsulting\Crypto\Aead\Aes256Gcm;
 use RoundlyConsulting\Crypto\Aead\DecryptionFailedException;
+use RoundlyConsulting\Crypto\Facades\Crypto;
+
+// A key is 32 random bytes. Keep it like any other secret, never next to the data.
+$key = Crypto::randomBytes(Aes256Gcm::KEY_BYTES);
 
 $aead = new Aes256Gcm; // or Crypto::aes256Gcm()
 
@@ -313,13 +320,33 @@ try {
 }
 
 // The RFC 5116 interface, with your own nonce (never reuse one under a key):
+$nonce = Crypto::randomBytes(Aes256Gcm::NONCE_BYTES);
 $ciphertext = $aead->encrypt($key, $nonce, $plaintext, $associatedData); // ciphertext ‖ tag
 $plaintext = $aead->decrypt($key, $nonce, $ciphertext, $associatedData);
 ```
 
-A wrong-length key or nonce throws `Aead\InvalidAeadParameterException`. With random nonces,
-keep one key below 2³² seals (NIST SP 800-38D §8.3) — derive a key per purpose rather than
-sharing one.
+**Raw bytes in, raw bytes out.** Keys, nonces and ciphertexts are binary strings. Encode them
+before you store them in a text column (or JSON, or a URL), and decode them before opening. A
+binary column (`$table->binary()`) takes them as they are.
+
+```php
+$stored = Crypto::base64Encode($aead->seal($key, $plaintext, associatedData: 'invoices:42'));
+
+$plaintext = $aead->open($key, Crypto::base64Decode($stored), associatedData: 'invoices:42');
+```
+
+**The associated data is not stored.** Nothing in the output carries it. Recompute the same
+bytes from the context when you open (above, `'invoices:42'` from the invoice being read), and
+keep their format stable: a different string fails to open, even one that means the same.
+
+Sizes: `seal()` returns `NONCE_BYTES + strlen($plaintext) + TAG_BYTES` bytes (28 bytes of
+overhead), `encrypt()` returns `strlen($plaintext) + TAG_BYTES`.
+
+A wrong-length key or nonce throws `Aead\InvalidAeadParameterException`. The exception is
+`open()`, which checks its input length first: anything shorter than 28 bytes
+(`NONCE_BYTES + TAG_BYTES`) throws `DecryptionFailedException`, even when the key length is
+also wrong. With random nonces, keep one key below 2³² seals (NIST SP 800-38D §8.3) — derive
+a key per purpose rather than sharing one.
 
 ### TOTP / HOTP (`Otp\Totp`, `Otp\Hotp`)
 
