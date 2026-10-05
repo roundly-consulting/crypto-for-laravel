@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Crypto\Signature\Key;
 
 use RoundlyConsulting\Crypto\Cose\UnsupportedAlgorithmException;
+use RoundlyConsulting\Crypto\Hash\ConstantTime;
 use RoundlyConsulting\Crypto\Signature\Algorithm;
 use RoundlyConsulting\Crypto\Signature\EdDSA;
 use RoundlyConsulting\Crypto\Signature\KeyLoadException;
@@ -32,6 +33,8 @@ final class OkpKey implements PublicKey
     private const int ED25519_PUBLIC_BYTES = 32;
 
     private const int ED25519_SECRET_BYTES = 64;
+
+    private const int ED25519_SEED_BYTES = 32;
 
     /** @var non-empty-string */
     public readonly string $publicKey;
@@ -79,7 +82,11 @@ final class OkpKey implements PublicKey
      * A signing key from a 64-byte libsodium Ed25519 secret key; the public half
      * is derived from it.
      *
-     * @throws KeyLoadException when the key is not exactly 64 bytes
+     * The key is libsodium's seed ‖ public key, and only the seed signs, so the
+     * pair is rebuilt from the seed and must reproduce the key exactly: a public
+     * half from another seed would load, then sign with a key no verifier holds.
+     *
+     * @throws KeyLoadException when the key is not exactly 64 bytes, or its public half does not match its seed
      * @throws UnsupportedAlgorithmException when ext-sodium is not loaded
      */
     public static function fromSecretKey(#[SensitiveParameter] string $secretKey): self
@@ -88,6 +95,19 @@ final class OkpKey implements PublicKey
 
         if (strlen($secretKey) !== self::ED25519_SECRET_BYTES) {
             throw KeyLoadException::unreadable('Ed25519 secret');
+        }
+
+        $seed = substr($secretKey, 0, self::ED25519_SEED_BYTES);
+        $keypair = sodium_crypto_sign_seed_keypair($seed);
+        $rebuilt = sodium_crypto_sign_secretkey($keypair);
+        $matches = ConstantTime::equals($rebuilt, $secretKey);
+
+        self::wipeSecret($seed);
+        self::wipeSecret($keypair);
+        self::wipeSecret($rebuilt);
+
+        if (! $matches) {
+            throw KeyLoadException::mismatchedKeyPair('Ed25519');
         }
 
         return new self(sodium_crypto_sign_publickey_from_secretkey($secretKey), $secretKey);

@@ -268,4 +268,21 @@ describe('OkpKey', function (): void {
         expect(strlen($key->publicKey))->toBe(32)
             ->and(strlen((string) $key->secretKey))->toBe(64);
     })->skip(fn (): bool => ! function_exists('sodium_crypto_sign_keypair'), 'ext-sodium not loaded');
+
+    it('loads a 64-byte secret key whose public half matches its seed', function (): void {
+        $generated = OkpKey::generate();
+        $loaded = OkpKey::fromSecretKey((string) $generated->secretKey);
+
+        expect($loaded->publicKey)->toBe($generated->publicKey);
+    })->skip(fn (): bool => ! function_exists('sodium_crypto_sign_keypair'), 'ext-sodium not loaded');
+
+    it('rejects a secret key whose public half belongs to another seed', function (): void {
+        // libsodium's 64-byte secret key is seed ‖ public key. A mismatched pair
+        // would load, then sign with a key no verifier holds.
+        $seed = substr((string) OkpKey::generate()->secretKey, 0, 32);
+        $otherPublic = OkpKey::generate()->publicKey;
+
+        OkpKey::fromSecretKey($seed.$otherPublic);
+    })->throws(KeyLoadException::class, 'public half does not match')
+        ->skip(fn (): bool => ! function_exists('sodium_crypto_sign_keypair'), 'ext-sodium not loaded');
 });

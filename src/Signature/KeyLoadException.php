@@ -23,6 +23,11 @@ final class KeyLoadException extends CryptoException
         return new self("The {$kind} key is not an {$expected} key.");
     }
 
+    public static function mismatchedKeyPair(string $kind): self
+    {
+        return new self("The {$kind} secret key's public half does not match its seed.");
+    }
+
     public static function unsupportedCurve(string $curve): self
     {
         return new self("The EC curve [{$curve}] is not supported.");
