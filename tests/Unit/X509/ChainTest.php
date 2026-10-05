@@ -98,7 +98,7 @@ it('fingerprints leaf to root, in that order', function (): void {
 
     expect($sha1[0])->toBe($chain->leaf()->fingerprint(HashAlgorithm::Sha1))
         ->and($sha1[2])->toBe($chain->root()->fingerprint(HashAlgorithm::Sha1))
-        ->and(array_slice($sha1, 1))->toBe($fixture->pinnedFingerprints())
+        ->and(array_slice($sha1, 1))->toBe($fixture->pinnedFingerprints(HashAlgorithm::Sha1))
         ->and($chain->fingerprints())->not->toBe($sha1);
 });
 

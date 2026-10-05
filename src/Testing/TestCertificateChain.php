@@ -52,22 +52,23 @@ final readonly class TestCertificateChain
     }
 
     /**
-     * Fingerprints leaf → root.
+     * Fingerprints leaf → root — SHA-256 by default, like {@see Chain::fingerprints()}.
+     * Pass {@see HashAlgorithm::Sha1} for a verifier that pins SHA-1.
      *
      * @return list<string>
      */
-    public function fingerprints(HashAlgorithm $algorithm = HashAlgorithm::Sha1): array
+    public function fingerprints(HashAlgorithm $algorithm = HashAlgorithm::Sha256): array
     {
         return $this->chain->fingerprints($algorithm);
     }
 
     /**
      * The [intermediate … root] slice — what a pinning verifier compares, since
-     * the leaf rotates and is never pinned.
+     * the leaf rotates and is never pinned. SHA-256 by default.
      *
      * @return list<string>
      */
-    public function pinnedFingerprints(HashAlgorithm $algorithm = HashAlgorithm::Sha1): array
+    public function pinnedFingerprints(HashAlgorithm $algorithm = HashAlgorithm::Sha256): array
     {
         return array_slice($this->fingerprints($algorithm), 1);
     }

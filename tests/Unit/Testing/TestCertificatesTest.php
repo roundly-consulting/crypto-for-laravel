@@ -99,15 +99,23 @@ it('produces x5c entries that load back as certificates', function (): void {
         ->and(Chain::fromX5c($x5c)->fingerprints())->toBe($fixture->chain->fingerprints());
 });
 
+it('fingerprints like the chain it wraps: SHA-256 unless told otherwise', function (): void {
+    $fixture = TestCertificates::chain();
+
+    expect($fixture->fingerprints())->toBe($fixture->chain->fingerprints())
+        ->and($fixture->pinnedFingerprints())->toBe(array_slice($fixture->chain->fingerprints(), 1))
+        ->and($fixture->fingerprints(HashAlgorithm::Sha1))->toBe($fixture->chain->fingerprints(HashAlgorithm::Sha1));
+});
+
 it('exposes the pinned fingerprints as the leafless slice', function (): void {
     $fixture = TestCertificates::chain();
 
     expect($fixture->pinnedFingerprints())
         ->toBe(array_slice($fixture->fingerprints(), 1))
         ->and($fixture->pinnedFingerprints())->toHaveCount(2)
-        ->and($fixture->pinnedFingerprints(HashAlgorithm::Sha256))
-        ->toBe(array_slice($fixture->fingerprints(HashAlgorithm::Sha256), 1))
-        ->and($fixture->fingerprints()[0])->toBe($fixture->leaf()->fingerprint(HashAlgorithm::Sha1));
+        ->and($fixture->pinnedFingerprints(HashAlgorithm::Sha1))
+        ->toBe(array_slice($fixture->fingerprints(HashAlgorithm::Sha1), 1))
+        ->and($fixture->fingerprints()[0])->toBe($fixture->leaf()->fingerprint(HashAlgorithm::Sha256));
 });
 
 it('bundles the chain as concatenated PEM', function (): void {
