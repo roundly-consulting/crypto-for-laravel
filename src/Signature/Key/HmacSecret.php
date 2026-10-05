@@ -26,7 +26,8 @@ use SensitiveParameter;
  * When ext-sodium is present the raw secret is best-effort wiped from memory when
  * the object is destroyed. PHP cannot guarantee wiping (copy-on-write may leave
  * other copies), so this is defence-in-depth, not a guarantee. The property is
- * intentionally not `readonly`: a readonly string cannot be zeroed in place.
+ * intentionally not `readonly`: a readonly string cannot be zeroed in place. It
+ * is `private(set)` instead, so nothing outside can swap in an unchecked value.
  */
 final class HmacSecret
 {
@@ -41,7 +42,7 @@ final class HmacSecret
      */
     private const int MAX_BYTES = 1024;
 
-    private function __construct(public string $value) {}
+    private function __construct(public private(set) string $value) {}
 
     /**
      * Best-effort wipe of the raw secret when ext-sodium is available. PHP cannot

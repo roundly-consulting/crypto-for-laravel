@@ -21,8 +21,9 @@ use SensitiveParameter;
  * When ext-sodium is present the raw secret key is best-effort wiped from memory
  * when the object is destroyed. PHP cannot guarantee wiping, so this is
  * defence-in-depth, not a guarantee. The `secretKey` property is intentionally
- * not `readonly`: a readonly string cannot be zeroed in place. The public key is
- * not secret and stays readonly.
+ * not `readonly`: a readonly string cannot be zeroed in place. It is
+ * `private(set)` instead, so nothing outside can swap in an unchecked key. The
+ * public key is not secret and stays readonly.
  */
 final class OkpKey implements PublicKey
 {
@@ -35,7 +36,7 @@ final class OkpKey implements PublicKey
     /** @var non-empty-string */
     public readonly string $publicKey;
 
-    public ?string $secretKey;
+    public private(set) ?string $secretKey;
 
     /**
      * @param  non-empty-string  $publicKey
