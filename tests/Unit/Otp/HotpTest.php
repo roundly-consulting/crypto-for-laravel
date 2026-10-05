@@ -51,3 +51,24 @@ it('exposes its configured digits and algorithm', function (): void {
 it('rejects an out-of-range digit count', function (int $digits): void {
     new Hotp(OtpAlgorithm::Sha1, $digits);
 })->throws(InvalidOtpParameterException::class)->with([[5], [11]]);
+
+/*
+ * HMAC zero-pads a short key, so an empty key and every all-zero key give the
+ * same, publicly computable codes. A secret must be real key material: at least
+ * 10 bytes (80 bits — the 16-character secrets authenticator apps have issued
+ * for years) and never all zero bytes.
+ */
+it('refuses a secret that decodes to no usable key', function (string $secret, string $reason): void {
+    expect(fn (): string => (new Hotp)->at($secret, 1))
+        ->toThrow(InvalidOtpParameterException::class, $reason);
+})->with([
+    'empty' => ['', 'must not be empty'],
+    'one zero byte' => ['AA', 'at least 10 bytes (80 bits)'],
+    'one zero byte, padded' => ['AA======', 'at least 10 bytes (80 bits)'],
+    'nine bytes' => [Base32::encode('123456789'), 'at least 10 bytes (80 bits)'],
+    'all zero bytes' => [Base32::encode(str_repeat("\0", 20)), 'must not be all zero bytes'],
+]);
+
+it('accepts an 80-bit secret, the floor', function (): void {
+    expect((new Hotp)->at(Base32::encode('1234567890'), 1))->toMatch('/^\d{6}$/');
+});

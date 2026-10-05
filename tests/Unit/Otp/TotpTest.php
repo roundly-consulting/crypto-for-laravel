@@ -117,3 +117,12 @@ it('rejects a non-positive period', function (): void {
 it('rejects an out-of-range digit count', function (): void {
     new Totp(OtpAlgorithm::Sha1, 4, 30);
 })->throws(InvalidOtpParameterException::class);
+
+it('never verifies a code against an empty secret', function (): void {
+    // The code anyone can compute: HMAC over the empty key.
+    $hash = hash_hmac('sha1', pack('J', intdiv(1_800_000_000, 30)), '', true);
+    $offset = ord($hash[19]) & 0x0F;
+    $code = str_pad((string) ((unpack('N', substr($hash, $offset, 4))[1] & 0x7FFFFFFF) % 1_000_000), 6, '0', STR_PAD_LEFT);
+
+    (new Totp)->verify('', $code, 1, 1_800_000_000);
+})->throws(InvalidOtpParameterException::class, 'must not be empty');

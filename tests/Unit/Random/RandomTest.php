@@ -5,6 +5,7 @@ declare(strict_types=1);
 use RoundlyConsulting\Crypto\Codec\Base32;
 use RoundlyConsulting\Crypto\Codec\Base64Url;
 use RoundlyConsulting\Crypto\Otp\Hotp;
+use RoundlyConsulting\Crypto\Otp\InvalidOtpParameterException;
 use RoundlyConsulting\Crypto\Otp\Totp;
 use RoundlyConsulting\Crypto\Random\Bytes;
 use RoundlyConsulting\Crypto\Random\InvalidLengthException;
@@ -129,8 +130,17 @@ it('only ever generates a secret the strict decoder and the OTP layer accept', f
     $expected = in_array($chars % 8, [1, 3, 6], true) ? $chars + 1 : $chars;
 
     expect(strlen($secret))->toBe($expected)
-        ->and(Base32::encode(Base32::decode($secret)))->toBe($secret)
-        ->and((new Totp)->codeAt($secret, 59))->toMatch('/^\d{6}$/')
+        ->and(Base32::encode(Base32::decode($secret)))->toBe($secret);
+
+    // The OTP layer takes 80 bits (16 characters) and up; anything shorter is
+    // refused rather than turned into guessable codes.
+    if ($expected < 16) {
+        expect(fn (): string => (new Hotp)->at($secret, 0))->toThrow(InvalidOtpParameterException::class);
+
+        return;
+    }
+
+    expect((new Totp)->codeAt($secret, 59))->toMatch('/^\d{6}$/')
         ->and((new Hotp)->at($secret, 0))->toMatch('/^\d{6}$/');
 })->with([...range(1, 64), 4094, 4095, Secret::MAXIMUM_CHARS]);
 
