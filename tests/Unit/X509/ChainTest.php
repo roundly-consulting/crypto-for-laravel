@@ -148,3 +148,25 @@ it('surfaces a malformed x5c entry as a typed crypto exception', function (): vo
     expect(fn (): Chain => Chain::fromX5c(['not base64 at all!!']))
         ->toThrow(RoundlyConsulting\Crypto\Exceptions\CryptoException::class);
 });
+
+it('refuses a chain that is not a list of certificates', function (Closure $build, string $reason): void {
+    // An x5c header is attacker-supplied: a gapped or mistyped chain must fail
+    // as a CryptoException here, never as a TypeError or an undefined index in
+    // leaf() / isLinked() later.
+    expect($build)->toThrow(InvalidChainException::class, $reason);
+})->with([
+    'a gap at the leaf' => [fn () => new Chain([1 => TestCertificates::chain(length: 1)->leaf()]), 'must be a list'],
+    'a gap mid-chain' => [function (): Chain {
+        [$leaf, $intermediate] = TestCertificates::chain()->chain->certificates();
+
+        return new Chain([0 => $leaf, 2 => $intermediate]);
+    }, 'must be a list'],
+    'string keys' => [fn () => new Chain(['leaf' => TestCertificates::chain(length: 1)->leaf()]), 'must be a list'],
+    'an item that is no certificate' => [fn () => new Chain(['x']), 'index [0] is not a certificate'],
+    'an x5c that was a JSON object' => [
+        fn () => Chain::fromX5c(json_decode('{"1":"'.TestCertificates::chain(length: 1)->leaf()->base64().'"}', true)),
+        'must be a list',
+    ],
+    'an x5c entry that is no string' => [fn () => Chain::fromX5c([['x']]), 'index [0] is not a string'],
+    'a PEM that is no string' => [fn () => Chain::fromPems([42]), 'index [0] is not a string'],
+]);

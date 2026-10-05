@@ -35,11 +35,11 @@ final readonly class Chain implements Countable, IteratorAggregate
     /**
      * @param  list<Certificate>  $certificates  leaf first, root last
      *
-     * @throws InvalidChainException
+     * @throws InvalidChainException when the chain is empty, over the cap, not a list, or holds anything but certificates
      */
     public function __construct(array $certificates)
     {
-        self::assertCount(count($certificates));
+        self::assertListOf($certificates, static fn (mixed $entry): bool => $entry instanceof Certificate, 'certificate');
 
         $this->certificates = $certificates;
     }
@@ -51,7 +51,7 @@ final readonly class Chain implements Countable, IteratorAggregate
      */
     public static function fromPems(array $pems): self
     {
-        self::assertCount(count($pems));
+        self::assertListOf($pems, is_string(...), 'string');
 
         return new self(array_map(Certificate::fromPem(...), $pems));
     }
@@ -66,7 +66,7 @@ final readonly class Chain implements Countable, IteratorAggregate
      */
     public static function fromX5c(array $x5c): self
     {
-        self::assertCount(count($x5c));
+        self::assertListOf($x5c, is_string(...), 'string');
 
         return new self(array_map(Certificate::fromBase64(...), $x5c));
     }
@@ -174,6 +174,32 @@ final readonly class Chain implements Countable, IteratorAggregate
             static fn (Certificate $certificate): string => $certificate->pem(),
             $this->certificates,
         ));
+    }
+
+    /**
+     * The entries must be a real list — leaf at 0, no gaps, no string keys —
+     * of the expected type, checked before anything is parsed or indexed: an
+     * `x5c` is whatever the token said, and a gap or a stray value would
+     * otherwise surface later as an undefined index or a TypeError.
+     *
+     * @param  array<mixed>  $entries
+     * @param  callable(mixed): bool  $accepts
+     *
+     * @throws InvalidChainException
+     */
+    private static function assertListOf(array $entries, callable $accepts, string $expected): void
+    {
+        self::assertCount(count($entries));
+
+        if (! array_is_list($entries)) {
+            throw InvalidChainException::notAList();
+        }
+
+        foreach ($entries as $index => $entry) {
+            if (! $accepts($entry)) {
+                throw InvalidChainException::invalidEntry($index, $expected);
+            }
+        }
     }
 
     /**

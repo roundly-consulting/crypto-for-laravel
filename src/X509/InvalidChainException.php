@@ -8,7 +8,8 @@ use RoundlyConsulting\Crypto\Exceptions\CryptoException;
 
 /**
  * Thrown when a certificate chain is structurally unusable: empty, longer than
- * the cap, or indexed out of range.
+ * the cap, not a list, holding an entry of the wrong type, or indexed out of
+ * range.
  */
 final class InvalidChainException extends CryptoException
 {
@@ -22,6 +23,16 @@ final class InvalidChainException extends CryptoException
         $max = Chain::MAX_CERTIFICATES;
 
         return new self("The certificate chain holds {$count} certificates, over the cap of {$max}.");
+    }
+
+    public static function notAList(): self
+    {
+        return new self('A certificate chain must be a list, leaf first: indexed 0, 1, 2, … with no gaps.');
+    }
+
+    public static function invalidEntry(int $index, string $expected): self
+    {
+        return new self("The chain entry at index [{$index}] is not a {$expected}.");
     }
 
     public static function outOfRange(int $index): self
