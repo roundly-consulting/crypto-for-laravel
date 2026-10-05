@@ -6,6 +6,8 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 
 ## Unreleased
 
+## 1.0.1 - 2026-10-05
+
 ### Changed
 
 - `TestCertificateChain::fingerprints()` and `pinnedFingerprints()` default to SHA-256, like
@@ -14,6 +16,9 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
   unpadded. Update any snapshot that pinned a lowercase or padded secret in the URI.
 - On a local disk, `fromStorageOrGenerate()` keeps an empty `<key>.lock` file next to the key it
   generates. Leave it in place.
+- Maintenance: `composer.json` `homepage` and `support.docs` now point to the documentation site.
+- Documentation: the README banner uses an absolute image URL, so it also renders on Packagist and
+  other sites.
 
 ### Fixed
 
