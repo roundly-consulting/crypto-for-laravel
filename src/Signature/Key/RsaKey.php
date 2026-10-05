@@ -173,21 +173,18 @@ final readonly class RsaKey implements PublicKey
      * Load a private key from a disk path, generating and persisting a fresh one
      * (the private PEM) when the file is missing. Derive and persist the public
      * side separately with {@see publicPem()}. An existing-but-invalid key is
-     * never overwritten — it still throws.
+     * never overwritten — it still throws. Concurrent first boots all get the
+     * one key written to disk.
      *
      * @throws KeyLoadException|WeakKeyException
      */
     public static function fromStorageOrGenerate(string $disk, string $path, int $bits = 2048): self
     {
-        if (self::storageHas($disk, $path)) {
-            return self::privateFromStorage($disk, $path);
-        }
-
-        $key = self::generate($bits);
-
-        self::persistPrivate($disk, $path, $key->privatePem());
-
-        return $key;
+        return self::private(self::readOrGenerate(
+            $disk,
+            $path,
+            static fn (): string => self::generate($bits)->privatePem(),
+        ));
     }
 
     public function algorithm(): Algorithm

@@ -43,6 +43,11 @@ final class KeyLoadException extends CryptoException
         return new self("Generated key material could not be written to disk [{$disk}] at [{$path}].", previous: $previous);
     }
 
+    public static function unlockable(string $disk, string $path): self
+    {
+        return new self("Key generation for disk [{$disk}] at [{$path}] could not be locked.");
+    }
+
     public static function missingConfig(string $key): self
     {
         return new self("Config key [{$key}] holds no key material (missing, blank, or not a string).");

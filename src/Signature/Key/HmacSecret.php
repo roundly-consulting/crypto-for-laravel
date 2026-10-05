@@ -123,22 +123,19 @@ final class HmacSecret
     /**
      * Load a secret from a disk path, generating and persisting a fresh one when
      * the file is missing. An existing-but-invalid secret is never overwritten —
-     * it still throws.
+     * it still throws. Concurrent first boots all get the one secret written to
+     * disk; `$bytes` only applies when generating.
      *
-     * @throws KeyLoadException when the disk is unreadable
-     * @throws WeakKeyException when an existing secret fails the strength guards
+     * @throws KeyLoadException when the disk is unreadable, or the secret cannot be locked or written
+     * @throws WeakKeyException when an existing secret fails the strength guards, or `$bytes` is out of range
      */
     public static function fromStorageOrGenerate(string $disk, string $path, int $bytes = self::MIN_BYTES): self
     {
-        if (self::storageHas($disk, $path)) {
-            return self::fromStorage($disk, $path);
-        }
-
-        $secret = self::generate($bytes);
-
-        self::persistPrivate($disk, $path, $secret->value);
-
-        return $secret;
+        return self::fromString(self::readOrGenerate(
+            $disk,
+            $path,
+            static fn (): string => self::generate($bytes)->value,
+        ));
     }
 
     /**

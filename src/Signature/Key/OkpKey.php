@@ -154,22 +154,19 @@ final class OkpKey implements PublicKey
     /**
      * Load a signing key from a disk path, generating and persisting a fresh one
      * (the raw 64-byte secret key) when the file is missing. An existing-but-
-     * invalid key is never overwritten — it still throws.
+     * invalid key is never overwritten — it still throws. Concurrent first boots
+     * all get the one key written to disk.
      *
-     * @throws KeyLoadException when the disk is unreadable or an existing secret is malformed
+     * @throws KeyLoadException when the disk is unreadable, the key cannot be locked or written, or an existing secret is malformed
      * @throws UnsupportedAlgorithmException when ext-sodium is not loaded
      */
     public static function fromStorageOrGenerate(string $disk, string $path): self
     {
-        if (self::storageHas($disk, $path)) {
-            return self::secretKeyFromStorage($disk, $path);
-        }
-
-        $key = self::generate();
-
-        self::persistPrivate($disk, $path, (string) $key->secretKey);
-
-        return $key;
+        return self::fromSecretKey(self::readOrGenerate(
+            $disk,
+            $path,
+            static fn (): string => (string) self::generate()->secretKey,
+        ));
     }
 
     public function algorithm(): Algorithm
