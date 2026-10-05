@@ -154,8 +154,9 @@ final class HmacSecret
             return true;
         }
 
-        // A parseable public key in PEM form.
-        if (@openssl_pkey_get_public($secret) !== false) {
+        // A parseable public key in PEM form — attempted on PEM TEXT only:
+        // OpenSSL would read a "file://" string as a path and open that file.
+        if (OpenSsl::isPemText($secret) && @openssl_pkey_get_public($secret) !== false) {
             OpenSsl::drainErrors();
 
             return true;

@@ -46,6 +46,23 @@ describe('HmacSecret', function (): void {
         HmacSecret::fromString($der);
     })->throws(WeakKeyException::class);
 
+    it('never reads a file:// path handed in as a secret', function (): void {
+        // openssl_pkey_get_public() treats a "file://" string as a PATH to read.
+        // A path to a real key file must fare exactly like a path to nothing:
+        // the string itself is the secret, and the file is never opened.
+        $path = (string) realpath(__DIR__.'/../../Fixtures/keys/rsa-public.pem');
+        $missing = dirname($path).'/no-such-key.pem';
+
+        expect(HmacSecret::fromString('file://'.$path)->value)->toBe('file://'.$path)
+            ->and(HmacSecret::fromString('file://'.$missing)->value)->toBe('file://'.$missing);
+    });
+
+    it('rejects a PEM that follows a preamble line', function (): void {
+        // OpenSSL skips text ahead of the boundary (`openssl pkcs12` writes
+        // "Bag Attributes" there), so the key must still be recognised.
+        HmacSecret::fromString("Bag Attributes\n".keyPem('rsa-public'));
+    })->throws(WeakKeyException::class, 'PEM-encoded key');
+
     it('accepts a CSPRNG secret that is unaffected by the key-material guard', function (): void {
         // Generated secrets never parse as keys; a fresh 32-byte value is fine.
         // strlen (not toHaveLength) so raw binary bytes are counted, not glyphs.
