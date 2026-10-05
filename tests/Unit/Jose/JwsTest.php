@@ -224,3 +224,17 @@ it('rejects a signed payload that is the JSON array [] rather than an object', f
 
     (new Jws)->verify($header.'.'.$payload.'.'.$signature, hsSigner(), Algorithm::HS256);
 })->throws(MalformedTokenException::class, 'must be a JSON object')->with(['[]', ' [ ] ', '"claims"', '42']);
+
+it('encodes claims with list-shaped keys as a JSON object verify() accepts', function (array $claims): void {
+    $jws = new Jws;
+    $compact = $jws->sign([], $claims, hsSigner());
+    [, $payload] = explode('.', $compact);
+
+    // PHP casts the string keys "0" and "1" to ints, which would make
+    // json_encode() write an array.
+    expect(Base64Url::decode($payload))->toStartWith('{')
+        ->and($jws->verify($compact, hsSigner(), Algorithm::HS256)->all())->toBe($claims);
+})->with([
+    'numeric-string keys' => [['0' => 'x', '1' => 'y']],
+    'a list' => [['a', 'b']],
+]);

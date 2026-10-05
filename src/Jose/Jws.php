@@ -37,7 +37,8 @@ final class Jws
      * byte-for-byte parity fixtures reproduce exactly.
      *
      * The claims are always a JSON OBJECT (RFC 7519 §7.2): no claims encode as
-     * `{}`, never the `[]` PHP's json_encode() makes of an empty array.
+     * `{}`, and keys PHP holds as `0, 1, …` stay object members — never the
+     * JSON array json_encode() makes of an empty or list-shaped array.
      *
      * @param  array<string, mixed>  $header  extra protected-header entries (e.g. `kid`)
      * @param  array<string, mixed>  $payload
@@ -50,7 +51,7 @@ final class Jws
 
         $segments = [
             Base64Url::encode($this->json($header)),
-            Base64Url::encode($payload === [] ? '{}' : $this->json($payload)),
+            Base64Url::encode($this->json((object) $payload)),
         ];
 
         $segments[] = Base64Url::encode($signer->sign(implode('.', $segments)));
@@ -135,11 +136,11 @@ final class Jws
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>|object  $data
      *
      * @throws MalformedTokenException
      */
-    private function json(array $data): string
+    private function json(array|object $data): string
     {
         try {
             // JSON_UNESCAPED_SLASHES keeps byte output identical to reference
