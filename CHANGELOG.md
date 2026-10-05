@@ -6,6 +6,43 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 
 ## Unreleased
 
+### Changed
+
+- `TestCertificateChain::fingerprints()` and `pinnedFingerprints()` default to SHA-256, like
+  `Chain::fingerprints()`. Pass `HashAlgorithm::Sha1` where your verifier pins SHA-1.
+- `ProvisioningUri::totp()` (and `Crypto::provisioningUri()`) writes the secret uppercase and
+  unpadded. Update any snapshot that pinned a lowercase or padded secret in the URI.
+- On a local disk, `fromStorageOrGenerate()` keeps an empty `<key>.lock` file next to the key it
+  generates. Leave it in place.
+
+### Fixed
+
+- Concurrent first boots calling `fromStorageOrGenerate()` (`HmacSecret`, `RsaKey`, `EcKey`,
+  `OkpKey`) now share one key: generation runs under a lock, re-checks the disk and returns the key
+  read back from it. Before, the last write won and the other processes kept signing with a key
+  that was no longer on disk.
+- `OkpKey::fromSecretKey()` throws `KeyLoadException` when the secret key's public half does not
+  belong to its seed, instead of loading a key whose signatures nothing verifies.
+- `Jws::sign()` always encodes the claims as a JSON object. Claims keyed `0, 1, …` used to become a
+  JSON array that `verify()` rejected.
+- `Chain`, `Chain::fromX5c()` and `Chain::fromPems()` (and `Crypto::x509()->chain()`) throw
+  `InvalidChainException` for a gapped or string-keyed array, or an entry of the wrong type,
+  instead of failing later with an undefined index or a `TypeError`.
+- `ProvisioningUri::totp()` rejects an empty or non-base32 secret instead of building a URI an
+  authenticator app enrols but `Totp` can never verify.
+
+### Security
+
+- `Hotp` and `Totp` throw `InvalidOtpParameterException` for a secret that is empty, shorter than
+  10 bytes (80 bits) or all zero bytes. Those secrets produced codes anyone could compute. Secrets
+  from `Secret::base32()` (160 bits by default) and the common 16-character secrets are unaffected.
+- `fromStorageOrGenerate()` on a local disk writes a new key to an owner-only temporary file and
+  renames it into place, so the key is never readable by others or half-written, and a failed
+  write leaves nothing behind for the next boot to adopt.
+- `HmacSecret::fromString()` no longer opens a `file://` path passed in as the secret.
+- `HmacSecret::$value` and `OkpKey::$secretKey` are `private(set)`: still readable, but no longer
+  writable from outside, so a validated key cannot be swapped for an unchecked one.
+
 ## 1.0.0 - 2026-10-03
 
 Initial public release.
