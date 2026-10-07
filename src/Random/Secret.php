@@ -8,8 +8,10 @@ use RoundlyConsulting\Crypto\Codec\Base32;
 
 /**
  * A TOTP-style shared secret: CSPRNG bytes rendered as base32 over the RFC 4648
- * alphabet, always in a form this package's own strict {@see Base32::decode()},
- * {@see \RoundlyConsulting\Crypto\Otp\Totp} and {@see \RoundlyConsulting\Crypto\Otp\Hotp} accept.
+ * alphabet, always in a form this package's own strict {@see Base32::decode()} accepts.
+ * {@see \RoundlyConsulting\Crypto\Otp\Totp} and {@see \RoundlyConsulting\Crypto\Otp\Hotp} also need
+ * at least 16 characters (80 bits, {@see \RoundlyConsulting\Crypto\Otp\Hotp::MIN_SECRET_BYTES}); the
+ * default 32 qualifies.
  */
 final class Secret
 {
