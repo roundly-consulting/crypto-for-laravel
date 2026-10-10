@@ -148,29 +148,19 @@ arch('reads config only in the key classes')
 
 // No third-party crypto/JOSE/CBOR/WebAuthn library ever enters the package.
 //
-// Each vendor is named by its real PSR-4 root(s): Pest resolves a name only through an
-// autoload root at or above it. A bare `ParagonIE` / `PragmaRX` (packages rooted at
-// `ParagonIE\ConstantTime\`, `PragmaRX\Google2FA\`, …) and `Web-Token` (a Composer vendor,
-// not a namespace) matched nothing even with the vendor installed — measured with a
-// simulated install. web-token/* ships the `Jose\…` roots below.
-arch('bans third-party crypto libraries')
-    ->expect([
-        'Firebase\JWT',
-        'Lcobucci\JWT',
-        'Jose\Component',
-        'Jose\Experimental',
-        'Jose\Bundle\JoseFramework',
-        'ParagonIE\ConstantTime',
-        'ParagonIE\Sodium',
-        'ParagonIE\Halite',
-        'ParagonIE\Paseto',
-        'ParagonIE\CipherSweet',
-        'CBOR',
-        'Cose',
-        'Webauthn',
-        'OTPHP',
-        'PragmaRX\Google2FA',
-        'PragmaRX\Google2FALaravel',
-        'PragmaRX\Google2FAQRCode',
-    ])
-    ->not->toBeUsed();
+// A source-token scan, not `->not->toBeUsed()`: Pest's arch layer resolves a name only
+// through an installed PSR-4 root at or above it, so it missed sibling packages under a
+// vendor prefix (web-token's old split `Jose\Component\Core\…` roots), and every vendor
+// that is not installed — the exact case a ban exists for. The preset resolves each name
+// through the file's namespace and imports, so a bare vendor prefix covers all its packages.
+ArchPresets::noVendorNamespace([
+    'Firebase\JWT',
+    'Lcobucci\JWT',
+    'Jose',
+    'ParagonIE',
+    'CBOR',
+    'Cose',
+    'Webauthn',
+    'OTPHP',
+    'PragmaRX',
+], __DIR__.'/../../src');
