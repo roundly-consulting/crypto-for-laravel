@@ -17,10 +17,14 @@ final class ConstantTime
     /**
      * Compare two strings in length-independent constant time.
      *
+     * Both inputs are `#[SensitiveParameter]`, as PHP marks both of `hash_equals()`'s:
+     * the known value is the secret, MAC, token or OTP being checked against, and the
+     * user value is a submitted credential. Neither may reach a stack trace.
+     *
      * @param  string  $known  the trusted/expected value
      * @param  string  $user  the attacker-influenced value
      */
-    public static function equals(string $known, #[SensitiveParameter] string $user): bool
+    public static function equals(#[SensitiveParameter] string $known, #[SensitiveParameter] string $user): bool
     {
         return hash_equals($known, $user);
     }

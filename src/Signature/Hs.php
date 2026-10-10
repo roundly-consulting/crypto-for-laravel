@@ -6,6 +6,7 @@ namespace RoundlyConsulting\Crypto\Signature;
 
 use RoundlyConsulting\Crypto\Hash\ConstantTime;
 use RoundlyConsulting\Crypto\Signature\Key\HmacSecret;
+use SensitiveParameter;
 
 /**
  * HMAC signer and verifier (HS256/HS384/HS512) over a validated shared secret.
@@ -50,7 +51,7 @@ final readonly class Hs implements Signer, Verifier
         return hash_hmac($this->algorithm->hashName(), $message, $this->key->value, true);
     }
 
-    public function verify(string $message, string $signature): bool
+    public function verify(string $message, #[SensitiveParameter] string $signature): bool
     {
         return ConstantTime::equals($this->sign($message), $signature);
     }

@@ -182,7 +182,7 @@ final class CryptoManager
         return new Digest($algorithm);
     }
 
-    public function constantTimeEquals(string $known, #[SensitiveParameter] string $user): bool
+    public function constantTimeEquals(#[SensitiveParameter] string $known, #[SensitiveParameter] string $user): bool
     {
         return ConstantTime::equals($known, $user);
     }

@@ -6,6 +6,13 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 
 ## Unreleased
 
+### Security
+
+- `ConstantTime::equals()` and `Crypto::constantTimeEquals()` mark the known value
+  `#[\SensitiveParameter]` as well as the user value. The expected secret, MAC, token or OTP no
+  longer shows up in stack traces, error reports or `debug_backtrace()` output. `Hmac::verify()` and
+  `Hs::verify()` also mark the submitted signature.
+
 ## 1.0.1 - 2026-10-05
 
 ### Changed

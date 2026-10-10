@@ -35,8 +35,9 @@ final readonly class Hmac
 
     /**
      * Constant-time verify of a raw-bytes signature against a freshly computed one.
+     * The submitted signature is sensitive too: a valid MAC authenticates its message.
      */
-    public function verify(string $message, string $signature, #[SensitiveParameter] string $key): bool
+    public function verify(string $message, #[SensitiveParameter] string $signature, #[SensitiveParameter] string $key): bool
     {
         return ConstantTime::equals($this->sign($message, $key), $signature);
     }
