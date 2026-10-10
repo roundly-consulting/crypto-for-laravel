@@ -6,6 +6,8 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 
 ## Unreleased
 
+## 1.1.2 - 2026-10-11
+
 ### Security
 
 - Signatures are now `#[SensitiveParameter]` in every frame that receives one, as `Hs::verify()`
@@ -13,7 +15,9 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
   `KeyVerifier::verify()`, the `Crypto::ecDer()` codec (`fromRaw()`, `toRaw()`, `isValid()`) and
   the `FlattenedJws` constructor. An exception thrown inside a verifier no longer leaves the
   signature in its stack trace, where beside the signing input (`header.payload`) it rebuilt the
-  bearer token. The message stays visible; on its own it is no credential.
+  bearer token. The message stays visible; on its own it is no credential. A custom `Verifier`
+  implementation must mark its own `$signature` `#[\SensitiveParameter]` too: PHP does not carry
+  the attribute over from the interface.
 
 ## 1.1.1 - 2026-10-10
 
