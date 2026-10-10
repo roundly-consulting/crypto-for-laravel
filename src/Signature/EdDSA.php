@@ -6,6 +6,7 @@ namespace RoundlyConsulting\Crypto\Signature;
 
 use RoundlyConsulting\Crypto\Cose\UnsupportedAlgorithmException;
 use RoundlyConsulting\Crypto\Signature\Key\OkpKey;
+use SensitiveParameter;
 
 /**
  * EdDSA (Ed25519) signer and verifier via ext-sodium.
@@ -47,7 +48,7 @@ final readonly class EdDSA implements Signer, Verifier
     /**
      * @throws UnsupportedAlgorithmException when ext-sodium is not loaded
      */
-    public function verify(string $message, string $signature): bool
+    public function verify(string $message, #[SensitiveParameter] string $signature): bool
     {
         if (! function_exists('sodium_crypto_sign_verify_detached')) {
             throw UnsupportedAlgorithmException::sodiumMissing();

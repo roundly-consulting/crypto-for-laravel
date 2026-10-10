@@ -2,16 +2,26 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Crypto\Codec\Base64Url;
 use RoundlyConsulting\Crypto\Codec\InvalidEncodingException;
 use RoundlyConsulting\Crypto\CryptoManager;
 use RoundlyConsulting\Crypto\Exceptions\CryptoException;
 use RoundlyConsulting\Crypto\Facades\Crypto;
+use RoundlyConsulting\Crypto\Jose\FlattenedJws;
 use RoundlyConsulting\Crypto\Jose\Jwk;
 use RoundlyConsulting\Crypto\Jose\MalformedJwkException;
 use RoundlyConsulting\Crypto\Jose\MalformedTokenException;
+use RoundlyConsulting\Crypto\Signature\Algorithm;
+use RoundlyConsulting\Crypto\Signature\Es;
 use RoundlyConsulting\Crypto\Signature\InvalidSignatureException;
+use RoundlyConsulting\Crypto\Signature\Key\EcKey;
+use RoundlyConsulting\Crypto\Signature\Key\OkpKey;
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
 use RoundlyConsulting\Crypto\Signature\KeyLoadException;
+use RoundlyConsulting\Crypto\Signature\KeyVerifier;
+use RoundlyConsulting\Crypto\Signature\OpenSsl;
+use RoundlyConsulting\Crypto\Signature\Rs;
+use RoundlyConsulting\Crypto\Signature\WeakKeyException;
 use RoundlyConsulting\Crypto\Testing\TestKeys;
 
 /**
@@ -267,3 +277,136 @@ it('keeps a secret passed through a flat facade call out of the trace', function
 
     expect(redactedArguments($error))->toBeGreaterThan(0);
 })->with('flat facade calls handed a secret');
+
+/**
+ * A signature is half a credential: every JWS verification frame also holds the signing input
+ * (`header.payload`), and the two rebuild the bearer token. So no frame the signature passes
+ * through on its way down may record it, verifiers and the DER ↔ raw codec included.
+ *
+ * The keys below are built past their own factories so the verifier throws INSIDE `verify()`,
+ * with the signature on the stack: each claims to be private, so the verifier derives its public
+ * half, and that half is refused (a 1024-bit RSA key; an RSA handle posing as an EC key).
+ */
+function rsaKeyThatThrowsInsideVerify(): RsaKey
+{
+    $reflection = new ReflectionClass(RsaKey::class);
+    $key = $reflection->newInstanceWithoutConstructor();
+    $reflection->getMethod('__construct')->invoke($key, openssl_pkey_get_public(keyPem('weak-1024-public')), true);
+
+    return $key;
+}
+
+function ecKeyThatThrowsInsideVerify(): EcKey
+{
+    $reflection = new ReflectionClass(EcKey::class);
+    $key = $reflection->newInstanceWithoutConstructor();
+    $reflection->getMethod('__construct')->invoke($key, openssl_pkey_get_public(keyPem('rsa-public')), true, 'P-256');
+
+    return $key;
+}
+
+/**
+ * The frame names from {@see framesLeaking()}, without their position in the trace.
+ *
+ * @param  list<string>  $frames
+ * @return list<string>
+ */
+function frameNames(array $frames): array
+{
+    return array_map(static fn (string $frame): string => (string) preg_replace('/#\d+$/', '', $frame), $frames);
+}
+
+it('keeps an RS256 signature out of the trace when the verifier throws inside verify', function (): void {
+    $token = Crypto::jws()->sign([], ['sub' => 'ada'], Crypto::rs(Crypto::keys()->rsa()->private(keyPem('rsa-private'))));
+    [$header, $payload, $signature] = explode('.', $token);
+    $verifier = Crypto::rs(rsaKeyThatThrowsInsideVerify());
+
+    $error = thrownBy(fn (): mixed => Crypto::jws()->verify($token, $verifier, Algorithm::RS256));
+
+    expect($error)->toBeInstanceOf(WeakKeyException::class)
+        ->and(framesLeaking($error, Base64Url::decode($signature)))->toBe([])
+        ->and(framesLeaking($error, $signature))->toBe([])
+        ->and(framesLeaking($error, $token))->toBe([])
+        // The signing input alone is no credential and stays visible: proof that the trace
+        // records arguments, and that the throw came from inside the verifier's frame.
+        ->and(frameNames(framesLeaking($error, $header.'.'.$payload)))->toContain(Rs::class.'->verify');
+});
+
+it('keeps an ES256 signature out of the trace when the verifier throws inside verify', function (): void {
+    $token = Crypto::jws()->sign([], ['sub' => 'ada'], Crypto::es(Crypto::keys()->ec()->private(keyPem('ec-private'))));
+    [$header, $payload, $signature] = explode('.', $token);
+    $verifier = Crypto::es(ecKeyThatThrowsInsideVerify());
+
+    $error = thrownBy(fn (): mixed => Crypto::jws()->verify($token, $verifier, Algorithm::ES256));
+
+    expect($error)->toBeInstanceOf(KeyLoadException::class)
+        ->and(framesLeaking($error, Base64Url::decode($signature)))->toBe([])
+        ->and(framesLeaking($error, $token))->toBe([])
+        ->and(frameNames(framesLeaking($error, $header.'.'.$payload)))->toContain(Es::class.'->verify');
+});
+
+it('keeps a DER signature out of the trace when the key verifier throws inside verify', function (): void {
+    $message = 'authenticator-data-and-client-data-hash';
+    $raw = Crypto::es(Crypto::keys()->ec()->private(keyPem('ec-private')))->sign($message);
+    $der = Crypto::ecDer()->fromRaw($raw);
+
+    $error = thrownBy(fn (): bool => Crypto::verifier()->verify(ecKeyThatThrowsInsideVerify(), $message, $der));
+
+    expect($error)->toBeInstanceOf(KeyLoadException::class)
+        ->and(framesLeaking($error, $der))->toBe([])
+        ->and(framesLeaking($error, $raw))->toBe([])
+        ->and(frameNames(framesLeaking($error, $message)))->toContain(KeyVerifier::class.'->verify', Es::class.'->verify');
+});
+
+it('keeps an ECDSA signature out of the trace when the codec refuses it', function (Closure $case): void {
+    [$convert, $needle] = $case();
+
+    $error = thrownBy($convert);
+
+    expect($error)->toBeInstanceOf(InvalidSignatureException::class)
+        ->and(framesLeaking($error, $needle))->toBe([])
+        ->and(redactedArguments($error))->toBeGreaterThanOrEqual(2);
+})->with([
+    'a raw P-256 signature read at the P-384 size' => [function (): array {
+        $raw = Crypto::es(Crypto::keys()->ec()->private(keyPem('ec-private')))->sign('message');
+
+        return [fn (): string => Crypto::ecDer()->fromRaw($raw, 48), $raw];
+    }],
+    'a DER P-384 signature read at the P-256 size' => [function (): array {
+        $der = Crypto::ecDer()->fromRaw(Crypto::es(TestKeys::ec('P-384'))->sign('message'), 48);
+
+        return [fn (): string => Crypto::ecDer()->toRaw($der, 32), $der];
+    }],
+]);
+
+/**
+ * Every package frame that takes a whole signature, made to throw on a different argument, so
+ * the frame is on the stack with the signature in it.
+ */
+dataset('frames handed a signature', function (): array {
+    $signature = 'c2lnbmF0dXJlLWJ5dGVzLXRoYXQtbXVzdC1ub3QtbGVhaw';
+    $rsa = static fn (): RsaKey => RsaKey::public(keyPem('rsa-public'));
+    $ec = static fn (): EcKey => EcKey::public(keyPem('ec-public'));
+
+    return [
+        'Hs::verify()' => [fn (): array => [fn (): mixed => Crypto::hs(TestKeys::hmacSecret())->verify(null, $signature), $signature]],
+        'Rs::verify()' => [fn (): array => [fn (): mixed => Crypto::rs($rsa())->verify(null, $signature), $signature]],
+        'Es::verify()' => [fn (): array => [fn (): mixed => Crypto::es($ec())->verify(null, $signature), $signature]],
+        'EdDSA::verify()' => [fn (): array => [fn (): mixed => Crypto::eddsa(OkpKey::ed25519(str_repeat("\x01", 32)))->verify(null, $signature), $signature]],
+        'KeyVerifier::verify()' => [fn (): array => [fn (): mixed => Crypto::verifier()->verify($rsa(), null, $signature), $signature]],
+        'OpenSsl::verify()' => [fn (): array => [fn (): mixed => OpenSsl::verify('message', $signature, null, OPENSSL_ALGO_SHA256), $signature]],
+        'DerCodec::fromRaw()' => [fn (): array => [fn (): mixed => Crypto::ecDer()->fromRaw($signature, null), $signature]],
+        'DerCodec::toRaw()' => [fn (): array => [fn (): mixed => Crypto::ecDer()->toRaw($signature, null), $signature]],
+        'FlattenedJws::__construct()' => [fn (): array => [fn (): mixed => new FlattenedJws('protected', null, $signature), $signature]],
+    ];
+});
+
+it('keeps a signature out of the frame of every verifier and codec', function (Closure $case): void {
+    [$call, $needle] = $case();
+
+    $error = thrownBy($call);
+
+    expect($error)->toBeInstanceOf(TypeError::class)
+        ->and(framesLeaking($error, $needle))->toBe([])
+        ->and(redactedArguments($error))->toBeGreaterThan(0);
+})->with('frames handed a signature');

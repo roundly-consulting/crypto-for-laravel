@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Crypto\Signature;
 use RoundlyConsulting\Crypto\Signature\Ec\Der;
 use RoundlyConsulting\Crypto\Signature\Key\EcKey;
 use RoundlyConsulting\Crypto\Signature\Key\PublicKey;
+use SensitiveParameter;
 
 /**
  * One-call signature verification that pins to a public key's own algorithm.
@@ -20,7 +21,7 @@ use RoundlyConsulting\Crypto\Signature\Key\PublicKey;
  */
 final class KeyVerifier
 {
-    public function verify(PublicKey $key, string $message, string $signature): bool
+    public function verify(PublicKey $key, string $message, #[SensitiveParameter] string $signature): bool
     {
         if ($key instanceof EcKey) {
             $signature = $this->normaliseEcdsa($signature, $key->coordinateBytes());
@@ -38,7 +39,7 @@ final class KeyVerifier
      * accepting DER (WebAuthn) or an already-raw value at the key's own
      * coordinate size.
      */
-    private function normaliseEcdsa(string $signature, int $coordinateBytes): ?string
+    private function normaliseEcdsa(#[SensitiveParameter] string $signature, int $coordinateBytes): ?string
     {
         if (Der::isValid($signature)) {
             try {

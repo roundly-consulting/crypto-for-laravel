@@ -86,7 +86,7 @@ final class OpenSsl
      * The key must be a PUBLIC-key handle: ext-openssl refuses a private one
      * here, and that refusal is indistinguishable from a bad signature.
      */
-    public static function verify(string $message, string $signature, OpenSSLAsymmetricKey $key, int $algorithm): bool
+    public static function verify(string $message, #[SensitiveParameter] string $signature, OpenSSLAsymmetricKey $key, int $algorithm): bool
     {
         $result = @openssl_verify($message, $signature, $key, $algorithm);
 

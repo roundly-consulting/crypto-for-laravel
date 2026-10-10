@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Crypto\Signature;
 
+use SensitiveParameter;
+
 /**
  * Verifies a detached signature over a message for exactly one algorithm.
  *
@@ -16,6 +18,9 @@ interface Verifier
 
     /**
      * Whether the signature is valid for the message under this verifier's key.
+     *
+     * The signature is `#[SensitiveParameter]`, and an implementation marks it too: beside
+     * the signing input it rebuilds a JWS bearer token, so it never belongs in a stack trace.
      */
-    public function verify(string $message, string $signature): bool;
+    public function verify(string $message, #[SensitiveParameter] string $signature): bool;
 }

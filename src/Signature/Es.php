@@ -6,6 +6,7 @@ namespace RoundlyConsulting\Crypto\Signature;
 
 use RoundlyConsulting\Crypto\Signature\Ec\Der;
 use RoundlyConsulting\Crypto\Signature\Key\EcKey;
+use SensitiveParameter;
 
 /**
  * ECDSA signer and verifier (ES256/ES384/ES512) on P-256, P-384, and P-521.
@@ -39,7 +40,7 @@ final readonly class Es implements Signer, Verifier
         return Der::toRaw($der, $this->key->coordinateBytes());
     }
 
-    public function verify(string $message, string $signature): bool
+    public function verify(string $message, #[SensitiveParameter] string $signature): bool
     {
         $coordinateBytes = $this->key->coordinateBytes();
 

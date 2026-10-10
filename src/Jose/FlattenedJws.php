@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Crypto\Jose;
 
 use JsonSerializable;
+use SensitiveParameter;
 
 /**
  * A flattened JWS JSON serialization (RFC 7515 §7.2.2), as used by ACME: the
@@ -16,7 +17,7 @@ final readonly class FlattenedJws implements JsonSerializable
     public function __construct(
         public string $protected,
         public string $payload,
-        public string $signature,
+        #[SensitiveParameter] public string $signature,
     ) {}
 
     /**

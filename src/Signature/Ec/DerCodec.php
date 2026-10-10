@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Crypto\Signature\Ec;
 
 use RoundlyConsulting\Crypto\Signature\InvalidSignatureException;
+use SensitiveParameter;
 
 /**
  * `Crypto::ecDer()` — the ECDSA signature-encoding codec: raw `r‖s` (JOSE,
@@ -19,7 +20,7 @@ final readonly class DerCodec
     /**
      * @throws InvalidSignatureException when the raw signature is not 2 × $coordBytes long
      */
-    public function fromRaw(string $rawRS, int $coordBytes = 32): string
+    public function fromRaw(#[SensitiveParameter] string $rawRS, int $coordBytes = 32): string
     {
         return Der::fromRaw($rawRS, $coordBytes);
     }
@@ -27,7 +28,7 @@ final readonly class DerCodec
     /**
      * @throws InvalidSignatureException when the DER is not a valid ECDSA signature
      */
-    public function toRaw(string $der, int $coordBytes = 32): string
+    public function toRaw(#[SensitiveParameter] string $der, int $coordBytes = 32): string
     {
         return Der::toRaw($der, $coordBytes);
     }
@@ -35,7 +36,7 @@ final readonly class DerCodec
     /**
      * Whether the bytes are a well-formed, minimally-encoded ECDSA DER signature.
      */
-    public function isValid(string $der): bool
+    public function isValid(#[SensitiveParameter] string $der): bool
     {
         return Der::isValid($der);
     }

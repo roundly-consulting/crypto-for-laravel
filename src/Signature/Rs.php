@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Crypto\Signature;
 
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
+use SensitiveParameter;
 
 /**
  * RSASSA-PKCS1-v1_5 signer and verifier (RS256/RS384/RS512) via ext-openssl.
@@ -40,7 +41,7 @@ final readonly class Rs implements Signer, Verifier
         return OpenSsl::sign($message, $this->key->key, $this->algorithm->opensslAlgorithm());
     }
 
-    public function verify(string $message, string $signature): bool
+    public function verify(string $message, #[SensitiveParameter] string $signature): bool
     {
         return OpenSsl::verify($message, $signature, $this->publicKey()->key, $this->algorithm->opensslAlgorithm());
     }

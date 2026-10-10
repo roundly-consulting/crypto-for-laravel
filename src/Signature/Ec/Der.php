@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Crypto\Signature\Ec;
 
 use RoundlyConsulting\Crypto\Signature\InvalidSignatureException;
+use SensitiveParameter;
 
 /**
  * ECDSA signature-encoding codec.
@@ -13,6 +14,9 @@ use RoundlyConsulting\Crypto\Signature\InvalidSignatureException;
  * WebAuthn deliver and the ASN.1 DER `SEQUENCE { INTEGER r, INTEGER s }` that
  * ext-openssl produces and consumes. This was independently reimplemented three
  * times across the fleet; it lives here once.
+ *
+ * Every frame that holds a whole signature marks it `#[SensitiveParameter]`:
+ * beside the signing input it rebuilds a JWS bearer token.
  */
 final class Der
 {
@@ -21,7 +25,7 @@ final class Der
      *
      * @throws InvalidSignatureException when the raw signature is the wrong length
      */
-    public static function fromRaw(string $rawRS, int $coordBytes = 32): string
+    public static function fromRaw(#[SensitiveParameter] string $rawRS, int $coordBytes = 32): string
     {
         if (strlen($rawRS) !== $coordBytes * 2) {
             throw InvalidSignatureException::make();
@@ -39,7 +43,7 @@ final class Der
      *
      * @throws InvalidSignatureException when the DER is not a valid ECDSA signature
      */
-    public static function toRaw(string $der, int $coordBytes = 32): string
+    public static function toRaw(#[SensitiveParameter] string $der, int $coordBytes = 32): string
     {
         if (! self::isValid($der)) {
             throw InvalidSignatureException::make();
@@ -62,7 +66,7 @@ final class Der
      * Whether the bytes are a well-formed, minimally-encoded ECDSA DER
      * signature — `SEQUENCE { INTEGER r, INTEGER s }` with nothing trailing.
      */
-    public static function isValid(string $der): bool
+    public static function isValid(#[SensitiveParameter] string $der): bool
     {
         $length = strlen($der);
 
@@ -99,7 +103,7 @@ final class Der
         return $offset === $length;
     }
 
-    private static function readInteger(string $der, int &$offset): string
+    private static function readInteger(#[SensitiveParameter] string $der, int &$offset): string
     {
         // Structure already validated by isValid(); advance past the INTEGER tag.
         $offset++;
@@ -126,7 +130,7 @@ final class Der
         return (ord($content[0]) & 0x80) === 0;
     }
 
-    private static function readLength(string $der, int &$offset): int
+    private static function readLength(#[SensitiveParameter] string $der, int &$offset): int
     {
         $length = self::readDerLength($der, $offset);
 
@@ -134,7 +138,7 @@ final class Der
         return $length ?? 0;
     }
 
-    private static function readDerLength(string $der, int &$offset): ?int
+    private static function readDerLength(#[SensitiveParameter] string $der, int &$offset): ?int
     {
         if ($offset >= strlen($der)) {
             return null;
@@ -190,12 +194,12 @@ final class Der
         return "\x02".self::lengthBytes($bytes).$bytes;
     }
 
-    private static function sequence(string $content): string
+    private static function sequence(#[SensitiveParameter] string $content): string
     {
         return "\x30".self::lengthBytes($content).$content;
     }
 
-    private static function lengthBytes(string $content): string
+    private static function lengthBytes(#[SensitiveParameter] string $content): string
     {
         $length = strlen($content);
 

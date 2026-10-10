@@ -19,11 +19,18 @@ declare(strict_types=1);
  * key-only bundle, a private JWK) would otherwise sit in the trace of the exception that
  * refuses it. That covers every frame the input passes through before it is refused.
  *
- * It is NOT marked for messages to sign or MAC, ciphertext, nonces, associated data, public
- * key objects, single key components (EC coordinates, an RSA modulus or exponent: no private
- * key arrives in that shape), COSE_Key / CBOR input (WebAuthn authenticator data, which never
- * carries a private key), signatures checked with a public key, or algorithm / length / label
- * / issuer / disk / path / config-key arguments.
+ * A whole SIGNATURE is marked in every frame that receives one, HMAC or public-key alike: each
+ * verifier (and the `Verifier` contract), the key verifier, the OpenSSL gateway, the ECDSA
+ * DER ↔ raw codec and its helpers, and the flattened JWS. A JWS verification frame also holds
+ * the signing input (`header.payload`), and the two together rebuild the bearer token; marking
+ * the signature alone breaks that, as `Hs::verify()` always did.
+ *
+ * It is NOT marked for messages to sign, MAC or verify (the signing input alone is no
+ * credential), ciphertext, nonces, associated data, public key objects, single key components
+ * (EC coordinates, an RSA modulus or exponent: no private key arrives in that shape), half a
+ * signature (one ECDSA integer), COSE_Key / CBOR input (WebAuthn authenticator data, which
+ * never carries a private key), or algorithm / length / label / issuer / disk / path /
+ * config-key arguments.
  *
  * Pinned three ways:
  *
@@ -77,6 +84,7 @@ function expectedSensitiveParameters(): array
         'Hash\Hmac::signHex($key)',
         'Hash\Hmac::verify($key)',
         'Hash\Hmac::verify($signature)',
+        'Jose\FlattenedJws::__construct($signature)',
         'Jose\Jwk::assertMembersWithinCap($members)',
         'Jose\Jwk::fromArray($members)',
         'Jose\Jwk::fromJson($json)',
@@ -91,7 +99,22 @@ function expectedSensitiveParameters(): array
         'Otp\Totp::verify($code)',
         'Otp\Totp::verify($secret)',
         'Random\Secret::canonicalize($secret)',
+        'Signature\Ec\Der::fromRaw($rawRS)',
+        'Signature\Ec\Der::isValid($der)',
+        'Signature\Ec\Der::lengthBytes($content)',
+        'Signature\Ec\Der::readDerLength($der)',
+        'Signature\Ec\Der::readInteger($der)',
+        'Signature\Ec\Der::readLength($der)',
+        'Signature\Ec\Der::sequence($content)',
+        'Signature\Ec\Der::toRaw($der)',
+        'Signature\Ec\DerCodec::fromRaw($rawRS)',
+        'Signature\Ec\DerCodec::isValid($der)',
+        'Signature\Ec\DerCodec::toRaw($der)',
+        'Signature\EdDSA::verify($signature)',
+        'Signature\Es::verify($signature)',
         'Signature\Hs::verify($signature)',
+        'Signature\KeyVerifier::normaliseEcdsa($signature)',
+        'Signature\KeyVerifier::verify($signature)',
         'Signature\Key\EcKey::private($pem)',
         'Signature\Key\EcKey::public($pem)',
         'Signature\Key\EcKeys::private($pem)',
@@ -114,6 +137,9 @@ function expectedSensitiveParameters(): array
         'Signature\Key\RsaKeys::private($pem)',
         'Signature\Key\RsaKeys::public($pem)',
         'Signature\OpenSsl::isPemText($input)',
+        'Signature\OpenSsl::verify($signature)',
+        'Signature\Rs::verify($signature)',
+        'Signature\Verifier::verify($signature)',
         'X509\Certificate::fromBase64($base64)',
         'X509\Certificate::fromDer($der)',
         'X509\Certificate::fromPem($pem)',
@@ -140,7 +166,7 @@ function secretParameterNames(): array
 {
     return [
         'code', 'compact', 'known', 'passphrase', 'password', 'pepper', 'plaintext',
-        'secret', 'secretKey', 'seed', 'token', 'user',
+        'secret', 'secretKey', 'seed', 'signature', 'token', 'user',
     ];
 }
 
@@ -214,5 +240,5 @@ it('marks every parameter named like a secret', function (): void {
 it('takes its inventory from the real source tree', function (): void {
     // Non-vacuous: an empty or broken scan would pass the three checks above.
     expect(count(sensitiveParameterInventory()))->toBeGreaterThan(300)
-        ->and(expectedSensitiveParameters())->toHaveCount(92);
+        ->and(expectedSensitiveParameters())->toHaveCount(111);
 });
