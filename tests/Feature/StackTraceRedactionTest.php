@@ -20,9 +20,9 @@ use RoundlyConsulting\Crypto\Testing\TestKeys;
  * in tests/Arch/SensitiveParameterTest.php lists the marked parameters; this proves the marks
  * hold on the paths an exception really takes.
  *
- * Flat calls that take a secret go through the injected manager here, not the facade:
- * Laravel's own `Facade::__callStatic()` frame records the arguments it forwards, and that
- * frame is not the package's to mark (see the technical docs, security notes).
+ * Most flat calls go through the injected manager here; the last case runs the same secrets
+ * through the facade, whose `__callStatic()` frame would otherwise record them raw (the facade
+ * uses the toolkit's `RedactsSensitiveArguments`; FacadeTest pins its count).
  */
 beforeEach(function (): void {
     // Production php.ini drops arguments from traces entirely, which would make every
@@ -229,3 +229,41 @@ it('keeps a private jwk out of the trace when it is refused', function (Closure 
         'X4cTteJY_gn4FYPsXB8rdXix5vwsg1FLN5E3EaG6RJoVH-HLLKD9',
     ]],
 ]);
+
+/**
+ * The same secrets through the facade's flat shortcuts. Laravel's stock `__callStatic()` frame
+ * holds every forwarded argument raw; the redacting facade replaces each one the manager marks
+ * with a `SensitiveParameterValue` before it forwards.
+ */
+dataset('flat facade calls handed a secret', function (): array {
+    $rsaPem = keyPem('rsa-private');
+    $rsaLine = explode("\n", $rsaPem)[3];
+    $rsaDer = (string) base64_decode((string) preg_replace('/-----[A-Z ]+-----|\s+/', '', $rsaPem), true);
+    $privateJwk = '{"kty":"EC","crv":"P-256","x":"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU","y":"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0","d":"jpsQnnGQmL-YBIffH1136cLDTpBWRMiCIqqqM4xsAhQ"}';
+
+    return [
+        'Crypto::certificate() given a private key' => [fn (): array => [fn (): mixed => Crypto::certificate($rsaPem), $rsaLine]],
+        'Crypto::chainFromPemBundle() given a key-only bundle' => [fn (): array => [fn (): mixed => Crypto::chainFromPemBundle($rsaPem), $rsaLine]],
+        'Crypto::chainFromX5c() given a private key' => [fn (): array => [fn (): mixed => Crypto::chainFromX5c([base64_encode($rsaDer)]), $rsaLine]],
+        'Crypto::jwkFromJson() given a private JWK' => [fn (): array => [fn (): mixed => Crypto::jwkFromJson($privateJwk), 'jpsQnnGQmL-YBIffH1136cLDTpBWRMiCIqqqM4xsAhQ']],
+        'Crypto::jwkFromArray() given a symmetric JWK' => [fn (): array => [fn (): mixed => Crypto::jwkFromArray(['kty' => 'oct', 'k' => 'GawgguFyGrWKav7AX4VKUg-shared-secret']), 'GawgguFyGrWKav7AX4VKUg-shared-secret']],
+        'Crypto::constantTimeEquals() given a non-string' => [fn (): array => [fn (): mixed => Crypto::constantTimeEquals('known-mac-value', []), 'known-mac-value']],
+        'Crypto::provisioningUri() given a spaced secret' => [fn (): array => [fn (): mixed => Crypto::provisioningUri('JBSW Y3DP EHPK 3PXP', 'ada@example.com', 'Example'), 'Y3DP']],
+        'Crypto::base64Decode() given a malformed key' => [fn (): array => [fn (): mixed => Crypto::base64Decode('c2VjcmV0LWtleS1tYXRlcmlhbA=!'), 'c2VjcmV0LWtleS1tYXRlcmlhbA']],
+    ];
+});
+
+it('keeps a secret passed through a flat facade call out of the trace', function (Closure $case): void {
+    $needles = $case();
+    $call = array_shift($needles);
+
+    $error = thrownBy($call);
+
+    expect($error)->toBeInstanceOf(Throwable::class);
+
+    foreach ($needles as $needle) {
+        expect(framesLeaking($error, $needle))->toBe([]);
+    }
+
+    expect(redactedArguments($error))->toBeGreaterThan(0);
+})->with('flat facade calls handed a secret');

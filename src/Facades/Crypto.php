@@ -6,12 +6,17 @@ namespace RoundlyConsulting\Crypto\Facades;
 
 use Illuminate\Support\Facades\Facade;
 use RoundlyConsulting\Crypto\CryptoManager;
+use RoundlyConsulting\PackageToolkit\Concerns\RedactsSensitiveArguments;
 
 /**
  * The whole toolbox behind one name. There is no `fake()`: this is stateless
  * computation with no database, queue, event, mail or HTTP call to intercept.
  * The only I/O — the opt-in key loaders' disk reads and first-boot writes — goes
  * through Laravel's `Storage`, which `Storage::fake()` already covers.
+ *
+ * Arguments the manager marks `#[SensitiveParameter]` (key material, certificates,
+ * OTP secrets, compared values, codec input) stay out of this facade's own stack
+ * frame; the harmless ones stay visible.
  *
  * @method static \RoundlyConsulting\Crypto\Jose\Jws jws()
  * @method static \RoundlyConsulting\Crypto\Jose\Jwk jwk(\RoundlyConsulting\Crypto\Signature\Key\PublicKey $key)
@@ -57,6 +62,8 @@ use RoundlyConsulting\Crypto\CryptoManager;
  */
 final class Crypto extends Facade
 {
+    use RedactsSensitiveArguments;
+
     protected static function getFacadeAccessor(): string
     {
         return CryptoManager::class;

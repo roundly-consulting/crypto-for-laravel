@@ -34,7 +34,12 @@ it('documents its root', function (): void {
     // which the convention lets expose service objects instead of actions.
     // No `toBeFakeable()`: nothing to intercept (no database, queue, event, mail or HTTP);
     // the key loaders' only I/O is Laravel's `Storage`, which `Storage::fake()` covers.
-    expect(Crypto::class)->toDocumentItsRoot();
+    // 15 root methods take a `#[SensitiveParameter]`: the five key/certificate loaders,
+    // `constantTimeEquals`, `provisioningUri` and the eight codecs. The facade keeps those
+    // arguments out of its own `__callStatic` frame and leaves the harmless ones visible.
+    expect(Crypto::class)
+        ->toDocumentItsRoot()
+        ->toRedactSensitiveArguments(methods: 15);
 });
 
 it('serves the same API to an injected manager', function (): void {

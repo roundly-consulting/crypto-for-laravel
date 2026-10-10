@@ -6,6 +6,14 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 
 ## Unreleased
 
+### Security
+
+- Flat `Crypto::` facade calls no longer leave `#[SensitiveParameter]` arguments in the facade's
+  stack frame: the key and certificate loaders (`jwkFromArray()`, `jwkFromJson()`,
+  `certificate()`, `chainFromX5c()`, `chainFromPemBundle()`), `constantTimeEquals()`,
+  `provisioningUri()` and the codecs now hide them there too, as the manager already did; the
+  other arguments stay visible. Requires package-toolkit `^1.3`.
+
 ## 1.1.0 - 2026-10-10
 
 ### Added
