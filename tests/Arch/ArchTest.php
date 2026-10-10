@@ -141,17 +141,30 @@ arch('reads config only in the key classes')
     ]);
 
 // No third-party crypto/JOSE/CBOR/WebAuthn library ever enters the package.
+//
+// Each vendor is named by its real PSR-4 root(s): Pest resolves a name only through an
+// autoload root at or above it. A bare `ParagonIE` / `PragmaRX` (packages rooted at
+// `ParagonIE\ConstantTime\`, `PragmaRX\Google2FA\`, …) and `Web-Token` (a Composer vendor,
+// not a namespace) matched nothing even with the vendor installed — measured with a
+// simulated install. web-token/* ships the `Jose\…` roots below.
 arch('bans third-party crypto libraries')
     ->expect([
         'Firebase\JWT',
         'Lcobucci\JWT',
-        'Web-Token',
         'Jose\Component',
-        'ParagonIE',
+        'Jose\Experimental',
+        'Jose\Bundle\JoseFramework',
+        'ParagonIE\ConstantTime',
+        'ParagonIE\Sodium',
+        'ParagonIE\Halite',
+        'ParagonIE\Paseto',
+        'ParagonIE\CipherSweet',
         'CBOR',
         'Cose',
         'Webauthn',
         'OTPHP',
-        'PragmaRX',
+        'PragmaRX\Google2FA',
+        'PragmaRX\Google2FALaravel',
+        'PragmaRX\Google2FAQRCode',
     ])
     ->not->toBeUsed();
