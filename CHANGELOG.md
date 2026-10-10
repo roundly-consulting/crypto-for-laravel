@@ -6,12 +6,19 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 
 ## Unreleased
 
+## 1.1.0 - 2026-10-10
+
 ### Added
 
 - `OkpKey::publicPem()` exports an Ed25519 public key as an RFC 8410 SubjectPublicKeyInfo PEM
   (`-----BEGIN PUBLIC KEY-----`), the same shape `EcKey::publicPem()` and `RsaKey::publicPem()`
   return, so a verifier that loads public keys from PEM can take an EdDSA key too. It works on a
   public-only key and needs neither ext-sodium nor ext-openssl.
+
+### Changed
+
+- Documentation: the `Secret` docblock states that `Totp` and `Hotp` need a secret of at least 16
+  base32 characters (80 bits); the default 32 qualifies.
 
 ### Security
 
