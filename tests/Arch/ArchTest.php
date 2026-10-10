@@ -129,10 +129,16 @@ arch('never reads env')
 // `config()` is read ONLY by the key classes' `*FromConfig` factories — an
 // explicit, consumer-invoked accessor of the CONSUMER's own key. No other class
 // may touch config. (The method-level guard in ZeroConfigScanTest asserts it
-// even more precisely, down to the individual factory methods.)
+// even more precisely, down to the individual factory methods.) The `Config`
+// facade and the injectable contract are the other two doors to the same store.
 arch('reads config only in the key classes')
     ->expect('RoundlyConsulting\Crypto')
-    ->not->toUse(['config', 'Illuminate\Config\Repository'])
+    ->not->toUse([
+        'config',
+        'Illuminate\Config\Repository',
+        'Illuminate\Contracts\Config\Repository',
+        'Illuminate\Support\Facades\Config',
+    ])
     ->ignoring([
         HmacSecret::class,
         RsaKey::class,
