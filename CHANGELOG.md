@@ -6,6 +6,13 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 
 ## Unreleased
 
+## 1.1.1 - 2026-10-10
+
+### Changed
+
+- Maintenance: `roundly-consulting/package-toolkit-for-laravel` is now required at `^1.3` (was
+  `^1.0`); the facade fix below builds on it, so `composer update` pulls it in.
+
 ### Security
 
 - Flat `Crypto::` facade calls no longer leave `#[SensitiveParameter]` arguments in the facade's
