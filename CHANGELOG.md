@@ -12,6 +12,11 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
   `#[\SensitiveParameter]` as well as the user value. The expected secret, MAC, token or OTP no
   longer shows up in stack traces, error reports or `debug_backtrace()` output. `Hmac::verify()` and
   `Hs::verify()` also mark the submitted signature.
+- Secrets no longer leak through a frame below a marked parameter. The codecs (`Base32`, `Base64`,
+  `Base64Url`, `Hex` and the `Crypto::*Encode()` / `*Decode()` methods), the data passed to
+  `Digest::raw()`, `hex()` and `withPepper()`, and the token passed to `Jws::verify()` are now
+  marked too. Before, an OTP secret that failed to decode (one copied with spaces, say) appeared in
+  the exception trace of `Totp::verify()`, `Hotp::at()` and `ProvisioningUri::totp()`.
 
 ## 1.0.1 - 2026-10-05
 

@@ -58,7 +58,7 @@ trait ReadsKeyMaterial
      *
      * @throws KeyLoadException when the config value is missing, blank, or not a string
      */
-    protected static function requireConfigString(string $key, mixed $value): string
+    protected static function requireConfigString(string $key, #[SensitiveParameter] mixed $value): string
     {
         if (! is_string($value) || trim($value) === '') {
             throw KeyLoadException::missingConfig($key);

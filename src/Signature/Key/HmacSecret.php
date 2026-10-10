@@ -42,7 +42,7 @@ final class HmacSecret
      */
     private const int MAX_BYTES = 1024;
 
-    private function __construct(public private(set) string $value) {}
+    private function __construct(#[SensitiveParameter] public private(set) string $value) {}
 
     /**
      * Best-effort wipe of the raw secret when ext-sodium is available. PHP cannot

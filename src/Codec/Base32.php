@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Crypto\Codec;
 
+use SensitiveParameter;
+
 /**
  * RFC 4648 base32 codec over the alphabet A–Z2–7, without padding on encode.
  *
@@ -13,6 +15,9 @@ namespace RoundlyConsulting\Crypto\Codec;
  * character that encodes no byte, and rejects a non-zero sub-byte remainder. That
  * makes decoding injective — no two distinct in-alphabet strings map to the same
  * bytes — while still decoding the unpadded secrets authenticator apps produce.
+ *
+ * Both directions take `#[SensitiveParameter]` input: OTP secrets, token bytes
+ * and keys pass through the codecs, as they do through PHP's own sodium codecs.
  */
 final class Base32
 {
@@ -21,7 +26,7 @@ final class Base32
     /** Valid `=` padding lengths for a base32 group (2/4/5/7 data chars). */
     private const array VALID_PADDING = [1, 3, 4, 6];
 
-    public static function encode(string $bytes): string
+    public static function encode(#[SensitiveParameter] string $bytes): string
     {
         if ($bytes === '') {
             return '';
@@ -49,7 +54,7 @@ final class Base32
      *                                  padding run, a dangling character, or a
      *                                  non-zero sub-byte remainder.
      */
-    public static function decode(string $base32): string
+    public static function decode(#[SensitiveParameter] string $base32): string
     {
         $normalized = strtoupper($base32);
 

@@ -11,6 +11,7 @@ use RoundlyConsulting\Crypto\Signature\Algorithm;
 use RoundlyConsulting\Crypto\Signature\AlgorithmMismatchException;
 use RoundlyConsulting\Crypto\Signature\Signer;
 use RoundlyConsulting\Crypto\Signature\Verifier;
+use SensitiveParameter;
 
 /**
  * Compact and flattened JSON Web Signature (RFC 7515).
@@ -64,10 +65,13 @@ final class Jws
      * string-equal $expected AND match the verifier's algorithm, both checked
      * before the signature is examined.
      *
+     * The compact token is `#[SensitiveParameter]`: a JWS is usually a bearer
+     * credential, so it never belongs in a stack trace.
+     *
      * @throws MalformedTokenException|AlgorithmMismatchException|InvalidEncodingException
      * @throws \RoundlyConsulting\Crypto\Signature\InvalidSignatureException
      */
-    public function verify(string $compact, Verifier $verifier, Algorithm $expected): Claims
+    public function verify(#[SensitiveParameter] string $compact, Verifier $verifier, Algorithm $expected): Claims
     {
         if ($verifier->algorithm() !== $expected) {
             throw AlgorithmMismatchException::keyForAlgorithm($expected);

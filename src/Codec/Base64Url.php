@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Crypto\Codec;
 
+use SensitiveParameter;
+
 /**
  * Strict base64url (RFC 7515 §2 / RFC 4648 §5) codec.
  *
@@ -11,10 +13,13 @@ namespace RoundlyConsulting\Crypto\Codec;
  * strict: it rejects any input carrying standard-base64 characters (`+`, `/`,
  * `=`) or bytes outside the base64url alphabet, so a tampered segment never
  * silently decodes into different bytes.
+ *
+ * Both directions take `#[SensitiveParameter]` input: OTP secrets, token bytes
+ * and keys pass through the codecs, as they do through PHP's own sodium codecs.
  */
 final class Base64Url
 {
-    public static function encode(string $bytes): string
+    public static function encode(#[SensitiveParameter] string $bytes): string
     {
         return rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');
     }
@@ -22,7 +27,7 @@ final class Base64Url
     /**
      * @throws InvalidEncodingException when the input is not valid, unpadded base64url.
      */
-    public static function decode(string $text): string
+    public static function decode(#[SensitiveParameter] string $text): string
     {
         // Reject anything outside the base64url alphabet up front — including the
         // standard-base64 `+`, `/` and any stray `=` padding.

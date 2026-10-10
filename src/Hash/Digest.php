@@ -12,6 +12,9 @@ use SensitiveParameter;
  * Deterministic by design: the same input always yields the same digest, which
  * is what makes a unique-index equality lookup possible. An optional pepper
  * switches the plain hash to an HMAC for defence-in-depth.
+ *
+ * The data is `#[SensitiveParameter]`: what gets digested for an at-rest lookup
+ * is a token, a password or personal data, never something a stack trace needs.
  */
 final readonly class Digest
 {
@@ -20,7 +23,7 @@ final readonly class Digest
     /**
      * The raw-bytes digest of the data.
      */
-    public function raw(string $data): string
+    public function raw(#[SensitiveParameter] string $data): string
     {
         return hash($this->algorithm->value, $data, true);
     }
@@ -28,7 +31,7 @@ final readonly class Digest
     /**
      * The lower-case hexadecimal digest of the data.
      */
-    public function hex(string $data): string
+    public function hex(#[SensitiveParameter] string $data): string
     {
         return hash($this->algorithm->value, $data, false);
     }
@@ -42,7 +45,7 @@ final readonly class Digest
      * trimmed), so a caller can never silently downgrade a keyed digest to an
      * unkeyed one by passing a blank string.
      */
-    public function withPepper(string $data, #[SensitiveParameter] ?string $pepper): string
+    public function withPepper(#[SensitiveParameter] string $data, #[SensitiveParameter] ?string $pepper): string
     {
         return $pepper === null
             ? hash($this->algorithm->value, $data, false)

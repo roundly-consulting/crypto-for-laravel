@@ -315,42 +315,42 @@ final class CryptoManager
 
     // ── Codecs ──────────────────────────────────────────────────────────────
 
-    public function base64UrlEncode(string $bytes): string
+    public function base64UrlEncode(#[SensitiveParameter] string $bytes): string
     {
         return Base64Url::encode($bytes);
     }
 
-    public function base64UrlDecode(string $text): string
+    public function base64UrlDecode(#[SensitiveParameter] string $text): string
     {
         return Base64Url::decode($text);
     }
 
-    public function base64Encode(string $bytes): string
+    public function base64Encode(#[SensitiveParameter] string $bytes): string
     {
         return Base64::encode($bytes);
     }
 
-    public function base64Decode(string $text): string
+    public function base64Decode(#[SensitiveParameter] string $text): string
     {
         return Base64::decode($text);
     }
 
-    public function base32Encode(string $bytes): string
+    public function base32Encode(#[SensitiveParameter] string $bytes): string
     {
         return Base32::encode($bytes);
     }
 
-    public function base32Decode(string $base32): string
+    public function base32Decode(#[SensitiveParameter] string $base32): string
     {
         return Base32::decode($base32);
     }
 
-    public function hexEncode(string $bytes): string
+    public function hexEncode(#[SensitiveParameter] string $bytes): string
     {
         return Hex::encode($bytes);
     }
 
-    public function hexDecode(string $hex): string
+    public function hexDecode(#[SensitiveParameter] string $hex): string
     {
         return Hex::decode($hex);
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Crypto\Signature;
 
 use OpenSSLAsymmetricKey;
+use SensitiveParameter;
 
 /**
  * Shared OpenSSL gateway.
@@ -104,9 +105,10 @@ final class OpenSsl
      * always carries a `-----BEGIN ` boundary, and OpenSSL tolerates preamble
      * lines ahead of it (`openssl pkcs12` writes "Bag Attributes"), so the test
      * is that boundary — plus the path prefix itself, since a file name could
-     * smuggle a boundary in.
+     * smuggle a boundary in. The input is often a private key or an HMAC secret,
+     * so it is `#[SensitiveParameter]`.
      */
-    public static function isPemText(string $input): bool
+    public static function isPemText(#[SensitiveParameter] string $input): bool
     {
         return ! str_starts_with($input, 'file://') && str_contains($input, '-----BEGIN ');
     }

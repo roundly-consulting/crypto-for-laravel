@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Crypto\Codec;
 
+use SensitiveParameter;
+
 /**
  * Strict standard (padded) base64 (RFC 4648 §4) codec.
  *
@@ -11,10 +13,13 @@ namespace RoundlyConsulting\Crypto\Codec;
  * interop with webhook and provider schemes that carry standard base64. Decoding
  * is strict: it rejects any byte outside the alphabet, wrong or missing padding,
  * and stray whitespace, so a tampered value never silently decodes.
+ *
+ * Both directions take `#[SensitiveParameter]` input: OTP secrets, token bytes
+ * and keys pass through the codecs, as they do through PHP's own sodium codecs.
  */
 final class Base64
 {
-    public static function encode(string $bytes): string
+    public static function encode(#[SensitiveParameter] string $bytes): string
     {
         return base64_encode($bytes);
     }
@@ -22,7 +27,7 @@ final class Base64
     /**
      * @throws InvalidEncodingException when the input is not valid, padded base64.
      */
-    public static function decode(string $text): string
+    public static function decode(#[SensitiveParameter] string $text): string
     {
         // Enforce canonical form up front: only the standard alphabet, a length
         // that is a multiple of four, and padding only at the tail.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Crypto\Random;
 
 use RoundlyConsulting\Crypto\Codec\Base32;
+use SensitiveParameter;
 
 /**
  * A TOTP-style shared secret: CSPRNG bytes rendered as base32 over the RFC 4648
@@ -66,7 +67,7 @@ final class Secret
      * remainder in the final character, which the strict decoder rejects. Zero
      * those remainder bits so the secret is canonical and round-trips.
      */
-    private static function canonicalize(string $secret, int $chars): string
+    private static function canonicalize(#[SensitiveParameter] string $secret, int $chars): string
     {
         $remainder = ($chars * 5) % 8;
 

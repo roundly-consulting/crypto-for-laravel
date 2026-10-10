@@ -97,7 +97,7 @@ final readonly class Totp
         return $matched;
     }
 
-    private function isWellFormed(string $code): bool
+    private function isWellFormed(#[SensitiveParameter] string $code): bool
     {
         return strlen($code) === $this->digits && ctype_digit($code);
     }
