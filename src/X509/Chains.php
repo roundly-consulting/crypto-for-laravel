@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Crypto\X509;
 
 use RoundlyConsulting\Crypto\Codec\InvalidEncodingException;
+use SensitiveParameter;
 
 /**
  * `Crypto::x509()->chain()` — build a leaf → root {@see Chain} from an `x5c`
@@ -20,7 +21,7 @@ final readonly class Chains
      *
      * @throws MalformedCertificateException|InvalidChainException|InvalidEncodingException
      */
-    public function fromX5c(array $x5c): Chain
+    public function fromX5c(#[SensitiveParameter] array $x5c): Chain
     {
         return Chain::fromX5c($x5c);
     }
@@ -30,7 +31,7 @@ final readonly class Chains
      *
      * @throws MalformedCertificateException|InvalidChainException
      */
-    public function fromPems(array $pems): Chain
+    public function fromPems(#[SensitiveParameter] array $pems): Chain
     {
         return Chain::fromPems($pems);
     }
@@ -38,7 +39,7 @@ final readonly class Chains
     /**
      * @throws MalformedCertificateException|InvalidChainException
      */
-    public function fromPemBundle(string $bundle): Chain
+    public function fromPemBundle(#[SensitiveParameter] string $bundle): Chain
     {
         return Chain::fromPemBundle($bundle);
     }

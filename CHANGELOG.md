@@ -17,6 +17,13 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
   `Digest::raw()`, `hex()` and `withPepper()`, and the token passed to `Jws::verify()` are now
   marked too. Before, an OTP secret that failed to decode (one copied with spaces, say) appeared in
   the exception trace of `Totp::verify()`, `Hotp::at()` and `ProvisioningUri::totp()`.
+- Loaders of public material mark their input too, because private keys come in the same
+  formats: `RsaKey::public()`, `EcKey::public()`, `OkpKey::ed25519()`, `Jwk::fromArray()` /
+  `fromJson()`, `Certificate::fromPem()` / `fromDer()` / `fromBase64()` and `Chain::fromPems()` /
+  `fromX5c()` / `fromPemBundle()`, with their `Crypto::keys()`, `Crypto::x509()`,
+  `Crypto::jwkFrom*()`, `Crypto::certificate()` and `Crypto::chainFrom*()` forms. A private key
+  handed to one by mistake (the wrong file, a key-only bundle, a private or symmetric JWK) no
+  longer shows up in the trace of the exception that refuses it.
 
 ## 1.0.1 - 2026-10-05
 

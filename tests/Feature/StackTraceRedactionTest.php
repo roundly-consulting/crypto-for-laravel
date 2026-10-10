@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 use RoundlyConsulting\Crypto\Codec\InvalidEncodingException;
 use RoundlyConsulting\Crypto\CryptoManager;
+use RoundlyConsulting\Crypto\Exceptions\CryptoException;
 use RoundlyConsulting\Crypto\Facades\Crypto;
+use RoundlyConsulting\Crypto\Jose\Jwk;
+use RoundlyConsulting\Crypto\Jose\MalformedJwkException;
 use RoundlyConsulting\Crypto\Jose\MalformedTokenException;
 use RoundlyConsulting\Crypto\Signature\InvalidSignatureException;
+use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
+use RoundlyConsulting\Crypto\Signature\KeyLoadException;
 use RoundlyConsulting\Crypto\Testing\TestKeys;
 
 /**
@@ -142,3 +147,85 @@ it('keeps a malformed bearer token out of the trace', function (): void {
     expect($error)->toBeInstanceOf(MalformedTokenException::class)
         ->and(framesLeaking($error, 'eyJzdWIiOiJhZGEifQ'))->toBe([]);
 });
+
+/**
+ * A private key handed to a PUBLIC loader by mistake: the wrong file, a key-only bundle, a
+ * private JWK. Each loader refuses it, and the refusal must not carry the key. The body line
+ * is a slice of the key's base64 body, so it also matches the PEM a DER loader builds; a DER
+ * case also looks for a slice of the raw bytes.
+ *
+ * Each case is a closure returning [the call, ...the needles], so the needle never becomes an
+ * argument of the test's own frames, which would leak it into the trace on the test's side.
+ */
+dataset('public loaders handed a private key', function (): array {
+    $rsaPem = keyPem('rsa-private');
+    $ecPem = keyPem('ec-private');
+    $rsaLine = explode("\n", $rsaPem)[3];
+    $ecLine = explode("\n", $ecPem)[1];
+    $rsaDer = (string) base64_decode((string) preg_replace('/-----[A-Z ]+-----|\s+/', '', $rsaPem), true);
+    $garbled = str_replace('A', '*', $rsaPem);
+    $crypto = static fn (): CryptoManager => app(CryptoManager::class);
+
+    return [
+        'RsaKey::public() given an EC private key' => [fn (): array => [fn (): mixed => $crypto()->keys()->rsa()->public($ecPem), $ecLine]],
+        'EcKey::public() given an RSA private key' => [fn (): array => [fn (): mixed => $crypto()->keys()->ec()->public($rsaPem), $rsaLine]],
+        'RsaKey::public() given a garbled private key' => [fn (): array => [fn (): mixed => RsaKey::public($garbled), explode("\n", $garbled)[3]]],
+        'Certificate::fromPem() given a private key' => [fn (): array => [fn (): mixed => $crypto()->certificate($rsaPem), $rsaLine]],
+        'Certificate::fromDer() given a private key' => [fn (): array => [fn (): mixed => $crypto()->x509()->fromDer($rsaDer), $rsaLine, substr($rsaDer, 96, 48)]],
+        'Certificate::fromBase64() given a private key' => [fn (): array => [fn (): mixed => $crypto()->x509()->fromBase64(base64_encode($rsaDer)), $rsaLine]],
+        'Chain::fromPemBundle() given a key-only bundle' => [fn (): array => [fn (): mixed => $crypto()->chainFromPemBundle($rsaPem), $rsaLine]],
+        'Chain::fromPems() given a private key' => [fn (): array => [fn (): mixed => $crypto()->x509()->chain()->fromPems([$rsaPem]), $rsaLine]],
+        'Chain::fromPems() given a key beside a non-string' => [fn (): array => [fn (): mixed => $crypto()->x509()->chain()->fromPems([$rsaPem, 42]), $rsaLine]],
+        'Chain::fromX5c() given a private key' => [fn (): array => [fn (): mixed => $crypto()->chainFromX5c([base64_encode($rsaDer)]), $rsaLine]],
+    ];
+});
+
+it('keeps a private key handed to a public loader out of the trace', function (Closure $case): void {
+    $needles = $case();
+    $load = array_shift($needles);
+
+    $error = thrownBy($load);
+
+    expect($error)->toBeInstanceOf(CryptoException::class);
+
+    foreach ($needles as $needle) {
+        expect(framesLeaking($error, $needle))->toBe([]);
+    }
+
+    expect(redactedArguments($error))->toBeGreaterThan(0);
+})->with('public loaders handed a private key');
+
+it('keeps an ed25519 secret key handed to the public loader out of the trace', function (): void {
+    $keypair = sodium_crypto_sign_keypair();
+    $secretKey = sodium_crypto_sign_secretkey($keypair);
+    $seed = substr($secretKey, 0, 32);
+
+    $error = thrownBy(fn (): mixed => app(CryptoManager::class)->keys()->ed25519()->public($secretKey));
+
+    expect($error)->toBeInstanceOf(KeyLoadException::class)
+        ->and(framesLeaking($error, $seed))->toBe([])
+        ->and(redactedArguments($error))->toBeGreaterThanOrEqual(2);
+})->skip(fn (): bool => ! function_exists('sodium_crypto_sign_keypair'), 'ext-sodium not loaded');
+
+it('keeps a private jwk out of the trace when it is refused', function (Closure $case): void {
+    [$parse, $secret] = $case();
+
+    $error = thrownBy($parse);
+
+    expect($error)->toBeInstanceOf(MalformedJwkException::class)
+        ->and(framesLeaking($error, $secret))->toBe([])
+        ->and(redactedArguments($error))->toBeGreaterThanOrEqual(2);
+})->with([
+    'a private EC JWK as JSON' => [fn (): array => [
+        fn (): mixed => app(CryptoManager::class)->jwkFromJson('{"kty":"EC","crv":"P-256","x":"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU","y":"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0","d":"jpsQnnGQmL-YBIffH1136cLDTpBWRMiCIqqqM4xsAhQ"}'),
+        'jpsQnnGQmL-YBIffH1136cLDTpBWRMiCIqqqM4xsAhQ',
+    ]],
+    'a symmetric JWK' => [fn (): array => [
+        fn (): mixed => app(CryptoManager::class)->jwkFromArray(['kty' => 'oct', 'k' => 'GawgguFyGrWKav7AX4VKUg-shared-secret']),
+        'GawgguFyGrWKav7AX4VKUg-shared-secret',
+    ]],
+    'a private RSA JWK with an oversized member' => [fn (): array => [
+        fn (): mixed => Jwk::fromArray(['kty' => 'RSA', 'n' => str_repeat('A', Jwk::MAX_MEMBER_BYTES + 1), 'e' => 'AQAB', 'd' => 'X4cTteJY_gn4FYPsXB8rdXix5vwsg1FLN5E3EaG6RJoVH-HLLKD9']),
+        'X4cTteJY_gn4FYPsXB8rdXix5vwsg1FLN5E3EaG6RJoVH-HLLKD9',
+    ]],
+]);

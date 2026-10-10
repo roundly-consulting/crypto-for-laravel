@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Crypto\X509;
 use OpenSSLAsymmetricKey;
 use OpenSSLCertificate;
 use RoundlyConsulting\Crypto\Signature\OpenSsl;
+use SensitiveParameter;
 
 /**
  * The X.509 OpenSSL gateway, mirroring {@see OpenSsl}.
@@ -26,7 +27,7 @@ final class OpenSslX509
      *
      * @throws MalformedCertificateException
      */
-    public static function read(string $pem): OpenSSLCertificate
+    public static function read(#[SensitiveParameter] string $pem): OpenSSLCertificate
     {
         $certificate = OpenSsl::isPemText($pem) ? @openssl_x509_read($pem) : false;
 

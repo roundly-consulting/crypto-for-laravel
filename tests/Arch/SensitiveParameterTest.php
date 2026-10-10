@@ -11,9 +11,19 @@ declare(strict_types=1);
  * The rule: a parameter is marked when it carries key material, a secret, a pepper, an OTP
  * secret or code, plaintext to encrypt, a value compared in constant time, a bearer token, or
  * the input of a codec or digest (the package routes OTP secrets, token bytes, keys, passwords
- * and tokens through those). It is NOT marked for messages to sign or MAC, ciphertext, nonces,
- * associated data, public keys, certificates, signatures checked with a public key, or
- * algorithm / length / label / issuer / disk / path / config-key arguments.
+ * and tokens through those).
+ *
+ * The input of a PUBLIC-material loader is marked too: a public key's PEM or raw bytes, a JWK,
+ * a certificate's PEM / DER / base64 DER, a chain's PEMs, bundle or x5c. Those are the very
+ * formats private keys are kept in, so a private key handed over by mistake (the wrong file, a
+ * key-only bundle, a private JWK) would otherwise sit in the trace of the exception that
+ * refuses it. That covers every frame the input passes through before it is refused.
+ *
+ * It is NOT marked for messages to sign or MAC, ciphertext, nonces, associated data, public
+ * key objects, single key components (EC coordinates, an RSA modulus or exponent: no private
+ * key arrives in that shape), COSE_Key / CBOR input (WebAuthn authenticator data, which never
+ * carries a private key), signatures checked with a public key, or algorithm / length / label
+ * / issuer / disk / path / config-key arguments.
  *
  * Pinned three ways:
  *
@@ -47,10 +57,15 @@ function expectedSensitiveParameters(): array
         'CryptoManager::base64Encode($bytes)',
         'CryptoManager::base64UrlDecode($text)',
         'CryptoManager::base64UrlEncode($bytes)',
+        'CryptoManager::certificate($pem)',
+        'CryptoManager::chainFromPemBundle($bundle)',
+        'CryptoManager::chainFromX5c($x5c)',
         'CryptoManager::constantTimeEquals($known)',
         'CryptoManager::constantTimeEquals($user)',
         'CryptoManager::hexDecode($hex)',
         'CryptoManager::hexEncode($bytes)',
+        'CryptoManager::jwkFromArray($members)',
+        'CryptoManager::jwkFromJson($json)',
         'CryptoManager::provisioningUri($secret)',
         'Hash\ConstantTime::equals($known)',
         'Hash\ConstantTime::equals($user)',
@@ -62,6 +77,11 @@ function expectedSensitiveParameters(): array
         'Hash\Hmac::signHex($key)',
         'Hash\Hmac::verify($key)',
         'Hash\Hmac::verify($signature)',
+        'Jose\Jwk::assertMembersWithinCap($members)',
+        'Jose\Jwk::fromArray($members)',
+        'Jose\Jwk::fromJson($json)',
+        'Jose\Jwk::readKeyType($members)',
+        'Jose\Jwk::rejectPrivateMembers($members)',
         'Jose\Jws::verify($compact)',
         'Otp\Hotp::at($secret)',
         'Otp\ProvisioningUri::totp($secret)',
@@ -73,21 +93,41 @@ function expectedSensitiveParameters(): array
         'Random\Secret::canonicalize($secret)',
         'Signature\Hs::verify($signature)',
         'Signature\Key\EcKey::private($pem)',
+        'Signature\Key\EcKey::public($pem)',
         'Signature\Key\EcKeys::private($pem)',
+        'Signature\Key\EcKeys::public($pem)',
         'Signature\Key\Ed25519Keys::private($secretKey)',
+        'Signature\Key\Ed25519Keys::public($rawPublic)',
         'Signature\Key\HmacSecret::__construct($value)',
         'Signature\Key\HmacSecret::carriesKeyMaterial($secret)',
         'Signature\Key\HmacSecret::fromString($secret)',
         'Signature\Key\HmacSecrets::fromString($secret)',
         'Signature\Key\OkpKey::__construct($secretKey)',
+        'Signature\Key\OkpKey::ed25519($rawPublic)',
         'Signature\Key\OkpKey::fromSecretKey($secretKey)',
         'Signature\Key\ReadsKeyMaterial::persistPrivate($contents)',
         'Signature\Key\ReadsKeyMaterial::requireConfigString($value)',
         'Signature\Key\ReadsKeyMaterial::wipeSecret($secret)',
         'Signature\Key\ReadsKeyMaterial::writeLocalAtomically($contents)',
         'Signature\Key\RsaKey::private($pem)',
+        'Signature\Key\RsaKey::public($pem)',
         'Signature\Key\RsaKeys::private($pem)',
+        'Signature\Key\RsaKeys::public($pem)',
         'Signature\OpenSsl::isPemText($input)',
+        'X509\Certificate::fromBase64($base64)',
+        'X509\Certificate::fromDer($der)',
+        'X509\Certificate::fromPem($pem)',
+        'X509\Certificates::fromBase64($base64)',
+        'X509\Certificates::fromDer($der)',
+        'X509\Certificates::fromPem($pem)',
+        'X509\Chain::assertListOf($entries)',
+        'X509\Chain::fromPemBundle($bundle)',
+        'X509\Chain::fromPems($pems)',
+        'X509\Chain::fromX5c($x5c)',
+        'X509\Chains::fromPemBundle($bundle)',
+        'X509\Chains::fromPems($pems)',
+        'X509\Chains::fromX5c($x5c)',
+        'X509\OpenSslX509::read($pem)',
     ];
 }
 
@@ -174,5 +214,5 @@ it('marks every parameter named like a secret', function (): void {
 it('takes its inventory from the real source tree', function (): void {
     // Non-vacuous: an empty or broken scan would pass the three checks above.
     expect(count(sensitiveParameterInventory()))->toBeGreaterThan(300)
-        ->and(expectedSensitiveParameters())->not->toBeEmpty();
+        ->and(expectedSensitiveParameters())->toHaveCount(92);
 });

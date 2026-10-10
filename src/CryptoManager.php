@@ -95,7 +95,7 @@ final class CryptoManager
      *
      * @throws MalformedJwkException
      */
-    public function jwkFromArray(array $members): Jwk
+    public function jwkFromArray(#[SensitiveParameter] array $members): Jwk
     {
         return Jwk::fromArray($members);
     }
@@ -103,7 +103,7 @@ final class CryptoManager
     /**
      * @throws MalformedJwkException
      */
-    public function jwkFromJson(string $json): Jwk
+    public function jwkFromJson(#[SensitiveParameter] string $json): Jwk
     {
         return Jwk::fromJson($json);
     }
@@ -116,7 +116,7 @@ final class CryptoManager
      *
      * @throws MalformedCertificateException
      */
-    public function certificate(string $pem): Certificate
+    public function certificate(#[SensitiveParameter] string $pem): Certificate
     {
         return $this->x509()->fromPem($pem);
     }
@@ -128,7 +128,7 @@ final class CryptoManager
      *
      * @throws MalformedCertificateException|InvalidChainException
      */
-    public function chainFromX5c(array $x5c): Chain
+    public function chainFromX5c(#[SensitiveParameter] array $x5c): Chain
     {
         return $this->x509()->chain()->fromX5c($x5c);
     }
@@ -138,7 +138,7 @@ final class CryptoManager
      *
      * @throws MalformedCertificateException|InvalidChainException
      */
-    public function chainFromPemBundle(string $bundle): Chain
+    public function chainFromPemBundle(#[SensitiveParameter] string $bundle): Chain
     {
         return $this->x509()->chain()->fromPemBundle($bundle);
     }

@@ -45,9 +45,12 @@ final readonly class RsaKey implements PublicKey
     /**
      * Load an RSA public key from PEM text — never a `file://` path.
      *
+     * The input is `#[SensitiveParameter]`: a private key handed over by mistake
+     * stays out of the trace of the exception that refuses it.
+     *
      * @throws KeyLoadException|WeakKeyException
      */
-    public static function public(string $pem): self
+    public static function public(#[SensitiveParameter] string $pem): self
     {
         $key = OpenSsl::isPemText($pem) ? openssl_pkey_get_public($pem) : false;
 

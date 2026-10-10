@@ -22,7 +22,7 @@ final readonly class Ed25519Keys
     /**
      * @throws KeyLoadException when the key is not exactly 32 bytes
      */
-    public function public(string $rawPublic): OkpKey
+    public function public(#[SensitiveParameter] string $rawPublic): OkpKey
     {
         return OkpKey::ed25519($rawPublic);
     }

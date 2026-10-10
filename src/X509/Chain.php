@@ -9,6 +9,7 @@ use Countable;
 use IteratorAggregate;
 use RoundlyConsulting\Crypto\Codec\InvalidEncodingException;
 use RoundlyConsulting\Crypto\Hash\HashAlgorithm;
+use SensitiveParameter;
 use Traversable;
 
 /**
@@ -49,11 +50,20 @@ final readonly class Chain implements Countable, IteratorAggregate
      *
      * @throws MalformedCertificateException|InvalidChainException
      */
-    public static function fromPems(array $pems): self
+    public static function fromPems(#[SensitiveParameter] array $pems): self
     {
         self::assertListOf($pems, is_string(...), 'string');
 
-        return new self(array_map(Certificate::fromPem(...), $pems));
+        // A loop, not array_map(): the frame of an internal function records its
+        // arguments unredacted, so a private key passed in by mistake would reach
+        // the trace of the exception that refuses it.
+        $certificates = [];
+
+        foreach ($pems as $pem) {
+            $certificates[] = Certificate::fromPem($pem);
+        }
+
+        return new self($certificates);
     }
 
     /**
@@ -64,11 +74,18 @@ final readonly class Chain implements Countable, IteratorAggregate
      *
      * @throws MalformedCertificateException|InvalidChainException|InvalidEncodingException
      */
-    public static function fromX5c(array $x5c): self
+    public static function fromX5c(#[SensitiveParameter] array $x5c): self
     {
         self::assertListOf($x5c, is_string(...), 'string');
 
-        return new self(array_map(Certificate::fromBase64(...), $x5c));
+        // A loop, not array_map(), for the reason given in fromPems().
+        $certificates = [];
+
+        foreach ($x5c as $entry) {
+            $certificates[] = Certificate::fromBase64($entry);
+        }
+
+        return new self($certificates);
     }
 
     /**
@@ -79,7 +96,7 @@ final readonly class Chain implements Countable, IteratorAggregate
      *
      * @throws MalformedCertificateException|InvalidChainException
      */
-    public static function fromPemBundle(string $bundle): self
+    public static function fromPemBundle(#[SensitiveParameter] string $bundle): self
     {
         preg_match_all(
             '/-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/s',
@@ -187,7 +204,7 @@ final readonly class Chain implements Countable, IteratorAggregate
      *
      * @throws InvalidChainException
      */
-    private static function assertListOf(array $entries, callable $accepts, string $expected): void
+    private static function assertListOf(#[SensitiveParameter] array $entries, callable $accepts, string $expected): void
     {
         self::assertCount(count($entries));
 

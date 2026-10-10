@@ -20,7 +20,7 @@ final readonly class RsaKeys
     /**
      * @throws KeyLoadException|WeakKeyException
      */
-    public function public(string $pem): RsaKey
+    public function public(#[SensitiveParameter] string $pem): RsaKey
     {
         return RsaKey::public($pem);
     }

@@ -67,9 +67,12 @@ final class OkpKey implements PublicKey
     /**
      * A public-only key from the raw 32-byte Ed25519 public key.
      *
+     * The input is `#[SensitiveParameter]`: a private key handed over by mistake
+     * stays out of the trace of the exception that refuses it.
+     *
      * @throws KeyLoadException when the key is not exactly 32 bytes
      */
-    public static function ed25519(string $rawPublic): self
+    public static function ed25519(#[SensitiveParameter] string $rawPublic): self
     {
         if (strlen($rawPublic) !== self::ED25519_PUBLIC_BYTES) {
             throw KeyLoadException::unreadable('Ed25519 public');

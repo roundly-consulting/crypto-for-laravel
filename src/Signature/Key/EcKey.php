@@ -59,9 +59,12 @@ final readonly class EcKey implements PublicKey
     /**
      * Load an EC public key from PEM text — never a `file://` path.
      *
+     * The input is `#[SensitiveParameter]`: a private key handed over by mistake
+     * stays out of the trace of the exception that refuses it.
+     *
      * @throws KeyLoadException
      */
-    public static function public(string $pem): self
+    public static function public(#[SensitiveParameter] string $pem): self
     {
         $key = OpenSsl::isPemText($pem) ? openssl_pkey_get_public($pem) : false;
 

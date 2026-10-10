@@ -18,6 +18,7 @@ use RoundlyConsulting\Crypto\Hash\HashAlgorithm;
 use RoundlyConsulting\Crypto\Signature\Key\EcKey;
 use RoundlyConsulting\Crypto\Signature\Key\PublicKey;
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
+use SensitiveParameter;
 
 /**
  * A parsed X.509 certificate (RFC 5280).
@@ -64,9 +65,12 @@ final readonly class Certificate
     /**
      * PEM text — never a `file://` path, which OpenSSL would read from disk.
      *
+     * The input is `#[SensitiveParameter]`: a private key handed over by mistake
+     * stays out of the trace of the exception that refuses it.
+     *
      * @throws MalformedCertificateException
      */
-    public static function fromPem(string $pem): self
+    public static function fromPem(#[SensitiveParameter] string $pem): self
     {
         self::assertWithinCap(strlen($pem));
 
@@ -81,7 +85,7 @@ final readonly class Certificate
      *
      * @throws MalformedCertificateException
      */
-    public static function fromDer(string $der): self
+    public static function fromDer(#[SensitiveParameter] string $der): self
     {
         self::assertWithinCap(strlen($der));
 
@@ -107,7 +111,7 @@ final readonly class Certificate
      *
      * @throws MalformedCertificateException|InvalidEncodingException
      */
-    public static function fromBase64(string $base64): self
+    public static function fromBase64(#[SensitiveParameter] string $base64): self
     {
         // Cap the ENCODED length before decoding: base64 is 4 bytes per 3.
         $max = intdiv(self::MAX_CERTIFICATE_BYTES * 4, 3) + 4;

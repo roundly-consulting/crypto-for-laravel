@@ -15,6 +15,7 @@ use RoundlyConsulting\Crypto\Signature\Key\EcKey;
 use RoundlyConsulting\Crypto\Signature\Key\OkpKey;
 use RoundlyConsulting\Crypto\Signature\Key\PublicKey;
 use RoundlyConsulting\Crypto\Signature\Key\RsaKey;
+use SensitiveParameter;
 
 /**
  * An RFC 7517 public JWK, plus its RFC 7638 thumbprint.
@@ -103,11 +104,14 @@ final readonly class Jwk implements JsonSerializable
      * Parse a JWK from its decoded members. See the class docblock for why the
      * parse is strict.
      *
+     * The input is `#[SensitiveParameter]`: a private key handed over by mistake
+     * stays out of the trace of the exception that refuses it.
+     *
      * @param  array<array-key, mixed>  $members
      *
      * @throws MalformedJwkException
      */
-    public static function fromArray(array $members): self
+    public static function fromArray(#[SensitiveParameter] array $members): self
     {
         self::assertMembersWithinCap($members);
 
@@ -138,7 +142,7 @@ final readonly class Jwk implements JsonSerializable
      *
      * @throws MalformedJwkException
      */
-    public static function fromJson(string $json): self
+    public static function fromJson(#[SensitiveParameter] string $json): self
     {
         $bytes = strlen($json);
 
@@ -384,7 +388,7 @@ final readonly class Jwk implements JsonSerializable
      *
      * @throws MalformedJwkException
      */
-    private static function assertMembersWithinCap(array $members): void
+    private static function assertMembersWithinCap(#[SensitiveParameter] array $members): void
     {
         foreach ($members as $value) {
             if (is_string($value) && strlen($value) > self::MAX_MEMBER_BYTES) {
@@ -398,7 +402,7 @@ final readonly class Jwk implements JsonSerializable
      *
      * @throws MalformedJwkException
      */
-    private static function readKeyType(array $members): JwkKeyType
+    private static function readKeyType(#[SensitiveParameter] array $members): JwkKeyType
     {
         $kty = $members['kty'] ?? null;
 
@@ -414,7 +418,7 @@ final readonly class Jwk implements JsonSerializable
      *
      * @throws MalformedJwkException
      */
-    private static function rejectPrivateMembers(array $members): void
+    private static function rejectPrivateMembers(#[SensitiveParameter] array $members): void
     {
         $found = array_values(array_intersect(self::PRIVATE_MEMBERS, array_map(strval(...), array_keys($members))));
 

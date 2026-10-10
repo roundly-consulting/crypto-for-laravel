@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Crypto\X509;
 
 use RoundlyConsulting\Crypto\Codec\InvalidEncodingException;
+use SensitiveParameter;
 
 /**
  * `Crypto::x509()` — parse a certificate from any of the three encodings it
@@ -18,7 +19,7 @@ final readonly class Certificates
     /**
      * @throws MalformedCertificateException
      */
-    public function fromPem(string $pem): Certificate
+    public function fromPem(#[SensitiveParameter] string $pem): Certificate
     {
         return Certificate::fromPem($pem);
     }
@@ -26,7 +27,7 @@ final readonly class Certificates
     /**
      * @throws MalformedCertificateException
      */
-    public function fromDer(string $der): Certificate
+    public function fromDer(#[SensitiveParameter] string $der): Certificate
     {
         return Certificate::fromDer($der);
     }
@@ -36,7 +37,7 @@ final readonly class Certificates
      *
      * @throws MalformedCertificateException|InvalidEncodingException
      */
-    public function fromBase64(string $base64): Certificate
+    public function fromBase64(#[SensitiveParameter] string $base64): Certificate
     {
         return Certificate::fromBase64($base64);
     }

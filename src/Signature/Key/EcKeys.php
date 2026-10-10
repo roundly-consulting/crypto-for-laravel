@@ -21,7 +21,7 @@ final readonly class EcKeys
     /**
      * @throws KeyLoadException
      */
-    public function public(string $pem): EcKey
+    public function public(#[SensitiveParameter] string $pem): EcKey
     {
         return EcKey::public($pem);
     }
