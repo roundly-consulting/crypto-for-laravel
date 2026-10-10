@@ -177,9 +177,10 @@ final class OkpKey implements PublicKey
 
     /**
      * Load a signing key from a disk path, generating and persisting a fresh one
-     * (the raw 64-byte secret key) when the file is missing. An existing-but-
-     * invalid key is never overwritten — it still throws. Concurrent first boots
-     * all get the one key written to disk.
+     * (the raw 64-byte secret key) when the file is missing. Derive and persist
+     * the public side separately with {@see publicPem()} (or the raw
+     * `publicKey`). An existing-but-invalid key is never overwritten — it still
+     * throws. Concurrent first boots all get the one key written to disk.
      *
      * @throws KeyLoadException when the disk is unreadable, the key cannot be locked or written, or an existing secret is malformed
      * @throws UnsupportedAlgorithmException when ext-sodium is not loaded
@@ -196,6 +197,19 @@ final class OkpKey implements PublicKey
     public function algorithm(): Algorithm
     {
         return Algorithm::EdDSA;
+    }
+
+    /**
+     * The public key as an RFC 8410 SubjectPublicKeyInfo PEM (`PUBLIC KEY`,
+     * OID 1.3.101.112), the same shape `EcKey::publicPem()` and
+     * `RsaKey::publicPem()` return, for a verifier that loads public keys from
+     * PEM. Works on a public-only key too, and needs neither ext-sodium nor
+     * ext-openssl. Ed25519 is the only curve this class holds, so the OID is
+     * always id-Ed25519.
+     */
+    public function publicPem(): string
+    {
+        return Asn1::ed25519PublicKeyPem($this->publicKey);
     }
 
     public function verifier(): Verifier

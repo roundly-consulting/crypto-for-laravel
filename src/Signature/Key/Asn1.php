@@ -9,7 +9,7 @@ namespace RoundlyConsulting\Crypto\Signature\Key;
  *
  * Builds the PEM ext-openssl needs to verify signatures from raw EC (P-256)
  * point coordinates or raw RSA modulus/exponent bytes — the form COSE keys and
- * JWKs carry them in.
+ * JWKs carry them in — and the PEM a raw Ed25519 public key exports as.
  *
  * @internal
  */
@@ -21,6 +21,9 @@ final class Asn1
     private const string OID_RSA_ENCRYPTION = "\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x01\x01";
 
     private const string DER_NULL = "\x05\x00";
+
+    /** id-Ed25519, 1.3.101.112 (RFC 8410 §3). */
+    private const string OID_ED25519 = "\x06\x03\x2B\x65\x70";
 
     /**
      * Assemble an EC public key PEM from an uncompressed point and the DER-encoded
@@ -42,6 +45,19 @@ final class Asn1
         $rsaKey = self::sequence(self::integer($modulus).self::integer($exponent));
         $algorithm = self::sequence(self::OID_RSA_ENCRYPTION.self::DER_NULL);
         $spki = self::sequence($algorithm.self::bitString($rsaKey));
+
+        return self::pem($spki);
+    }
+
+    /**
+     * Assemble an Ed25519 public key PEM from the raw 32-byte key (RFC 8410 §4):
+     * the id-Ed25519 algorithm with its parameters ABSENT, and the key itself as
+     * the BIT STRING.
+     */
+    public static function ed25519PublicKeyPem(string $rawPublic): string
+    {
+        $algorithm = self::sequence(self::OID_ED25519);
+        $spki = self::sequence($algorithm.self::bitString($rawPublic));
 
         return self::pem($spki);
     }
