@@ -149,9 +149,21 @@ it('signs with its own openssl config, not the host default', function (): void 
     // writes itself, so a host whose default openssl.cnf lacks them still mints.
     $fixture = TestCertificates::chain(dnsNames: ['config.test']);
 
+    // Parallel workers mint certificates too, so their in-flight configs may sit in the
+    // shared temp dir right now. Ours must not linger: every config seen after the call
+    // has to vanish within a moment, and a leaked one never would.
+    $remaining = glob(sys_get_temp_dir().'/crypto-x509-*') ?: [];
+    $deadline = microtime(true) + 2.0;
+
+    while ($remaining !== [] && microtime(true) < $deadline) {
+        usleep(10_000);
+        clearstatcache();
+        $remaining = array_values(array_filter($remaining, file_exists(...)));
+    }
+
     expect($fixture->leaf()->dnsNames())->toBe(['config.test'])
         ->and($fixture->root()->signatureAlgorithm())->toBe('ecdsa-with-SHA256')
-        ->and(glob(sys_get_temp_dir().'/crypto-x509-*'))->toBe([]);
+        ->and($remaining)->toBe([]);
 });
 
 it('surfaces an OpenSSL refusal as a typed exception', function (): void {

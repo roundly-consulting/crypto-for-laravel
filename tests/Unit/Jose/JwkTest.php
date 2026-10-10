@@ -425,8 +425,9 @@ it('applies the package key policy when the JWK becomes a key', function (): voi
     $weak = RsaKey::public(keyPem('rsa-public'));
     $members = Jwk::fromPublicKey($weak)->toArray();
 
-    // A 1024-bit modulus: parseable as a JWK, refused as a key.
-    $members['n'] = Base64Url::encode(random_bytes(128));
+    // A 1024-bit modulus: parseable as a JWK, refused as a key. The set top bit keeps it
+    // minimal; a random leading zero octet would be rejected by the parse instead.
+    $members['n'] = Base64Url::encode("\x80".random_bytes(127));
     $members['e'] = 'AQAB';
 
     $jwk = Jwk::fromArray($members);
