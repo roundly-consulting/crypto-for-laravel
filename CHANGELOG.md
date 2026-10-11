@@ -6,6 +6,8 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 
 ## Unreleased
 
+## 1.2.0 - 2026-10-11
+
 ### Added
 
 - `Crypto::hkdf($algorithm = Sha256)->derive($ikm, $length, $info = '', $salt = '')`: HKDF
