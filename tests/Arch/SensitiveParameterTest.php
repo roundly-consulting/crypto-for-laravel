@@ -80,6 +80,7 @@ function expectedSensitiveParameters(): array
         'Hash\Digest::raw($data)',
         'Hash\Digest::withPepper($data)',
         'Hash\Digest::withPepper($pepper)',
+        'Hash\Hkdf::derive($ikm)',
         'Hash\Hmac::sign($key)',
         'Hash\Hmac::signHex($key)',
         'Hash\Hmac::verify($key)',
@@ -165,7 +166,7 @@ function expectedSensitiveParameters(): array
 function secretParameterNames(): array
 {
     return [
-        'code', 'compact', 'known', 'passphrase', 'password', 'pepper', 'plaintext',
+        'code', 'compact', 'ikm', 'known', 'passphrase', 'password', 'pepper', 'plaintext',
         'secret', 'secretKey', 'seed', 'signature', 'token', 'user',
     ];
 }
@@ -240,5 +241,5 @@ it('marks every parameter named like a secret', function (): void {
 it('takes its inventory from the real source tree', function (): void {
     // Non-vacuous: an empty or broken scan would pass the three checks above.
     expect(count(sensitiveParameterInventory()))->toBeGreaterThan(300)
-        ->and(expectedSensitiveParameters())->toHaveCount(111);
+        ->and(expectedSensitiveParameters())->toHaveCount(112);
 });

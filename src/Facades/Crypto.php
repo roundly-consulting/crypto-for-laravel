@@ -30,6 +30,7 @@ use RoundlyConsulting\PackageToolkit\Concerns\RedactsSensitiveArguments;
  * @method static \RoundlyConsulting\Crypto\Aead\Aes256Gcm aes256Gcm()
  * @method static \RoundlyConsulting\Crypto\Hash\Hmac hmac(\RoundlyConsulting\Crypto\Hash\HashAlgorithm $algorithm = \RoundlyConsulting\Crypto\Hash\HashAlgorithm::Sha256)
  * @method static \RoundlyConsulting\Crypto\Hash\Digest digest(\RoundlyConsulting\Crypto\Hash\HashAlgorithm $algorithm = \RoundlyConsulting\Crypto\Hash\HashAlgorithm::Sha256)
+ * @method static \RoundlyConsulting\Crypto\Hash\Hkdf hkdf(\RoundlyConsulting\Crypto\Hash\HashAlgorithm $algorithm = \RoundlyConsulting\Crypto\Hash\HashAlgorithm::Sha256)
  * @method static bool constantTimeEquals(string $known, string $user)
  * @method static \RoundlyConsulting\Crypto\Signature\Hs hs(\RoundlyConsulting\Crypto\Signature\Key\HmacSecret $key, \RoundlyConsulting\Crypto\Signature\Algorithm $algorithm = \RoundlyConsulting\Crypto\Signature\Algorithm::HS256)
  * @method static \RoundlyConsulting\Crypto\Signature\Rs rs(\RoundlyConsulting\Crypto\Signature\Key\RsaKey $key, \RoundlyConsulting\Crypto\Signature\Algorithm $algorithm = \RoundlyConsulting\Crypto\Signature\Algorithm::RS256)

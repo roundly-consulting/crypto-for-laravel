@@ -6,6 +6,15 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 
 ## Unreleased
 
+### Added
+
+- `Crypto::hkdf($algorithm = Sha256)->derive($ikm, $length, $info = '', $salt = '')`: HKDF
+  (RFC 5869) per-purpose subkeys from one root secret, byte-identical to `hash_hkdf()` and pinned
+  by the RFC 5869 Appendix A vectors. The input keying material is `#[SensitiveParameter]`, and the
+  length is always explicit: `0` (which `hash_hkdf()` reads as one hash length) and anything above
+  255 × the hash length throw the new `Hash\InvalidHkdfParameterException`, as does empty input
+  keying material.
+
 ## 1.1.3 - 2026-10-11
 
 ### Changed

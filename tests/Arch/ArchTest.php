@@ -27,7 +27,7 @@ ArchPresets::strictTypes('RoundlyConsulting\Crypto');
  * The list moved to the `$ignoring` PARAMETER, which buys the two things Pest's fluent
  * `->ignoring()` cannot: rot-checking, and recovery of the prefix SHADOW (Pest matches
  * exemptions by string prefix, not class identity — pest-plugin-arch Blueprint.php:103).
- * Measured across all 69 concrete classes here: this list shadows **nothing**. The package
+ * Measured across all 71 concrete classes here: this list shadows **nothing**. The package
  * holds exactly one latent prefix pair — `Codec\Base64` over `Codec\Base64Url` — and both
  * are final, so the guard is prospective: it fires the day Base64 is exempted and Base64Url
  * is opened.
@@ -49,7 +49,8 @@ ArchPresets::finalByDefault('RoundlyConsulting\Crypto', [
  * Exempted (they legitimately implement the primitives — that is their entire job):
  *
  *   - Aead\        — Aes256Gcm (openssl_encrypt / openssl_decrypt ARE the AEAD)
- *   - Hash\        — Digest, Hmac, HashAlgorithm, ConstantTime (hash, hash_hmac, hash_equals)
+ *   - Hash\        — Digest, Hmac, Hkdf, HashAlgorithm, ConstantTime (hash, hash_hmac, hash_hkdf,
+ *                    hash_equals)
  *   - Signature\   — the OpenSsl gateway, Algorithm/Hs/EdDSA, and the Key\* loaders
  *   - Codec\       — Base64, Base64Url (base64_encode/decode ARE the codec)
  *   - Random\      — Bytes, Token (random_bytes, random_int)

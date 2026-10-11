@@ -16,6 +16,7 @@ use RoundlyConsulting\Crypto\Cose\CoseKey;
 use RoundlyConsulting\Crypto\Hash\ConstantTime;
 use RoundlyConsulting\Crypto\Hash\Digest;
 use RoundlyConsulting\Crypto\Hash\HashAlgorithm;
+use RoundlyConsulting\Crypto\Hash\Hkdf;
 use RoundlyConsulting\Crypto\Hash\Hmac;
 use RoundlyConsulting\Crypto\Jose\Jwk;
 use RoundlyConsulting\Crypto\Jose\Jws;
@@ -50,7 +51,7 @@ use SensitiveParameter;
  * A discoverability front for the package's whole toolbox.
  *
  * Fronted by the {@see Facades\Crypto} facade so that typing `Crypto::` reveals
- * every entry point — codecs, CSPRNG, hashing, authenticated encryption, signers,
+ * every entry point — codecs, CSPRNG, hashing, key derivation, authenticated encryption, signers,
  * JOSE, COSE, and OTP.
  * Every helper takes key material and knobs as explicit arguments; this manager
  * reads no config of its own and holds no secret. The purely-static codecs and
@@ -180,6 +181,15 @@ final class CryptoManager
     public function digest(HashAlgorithm $algorithm = HashAlgorithm::Sha256): Digest
     {
         return new Digest($algorithm);
+    }
+
+    /**
+     * HKDF (RFC 5869): per-purpose subkeys from one root secret, e.g.
+     * `Crypto::hkdf()->derive($key, 32, 'fingerprint')`.
+     */
+    public function hkdf(HashAlgorithm $algorithm = HashAlgorithm::Sha256): Hkdf
+    {
+        return new Hkdf($algorithm);
     }
 
     public function constantTimeEquals(#[SensitiveParameter] string $known, #[SensitiveParameter] string $user): bool
