@@ -21,11 +21,16 @@ final class ConstantTime
      * the known value is the secret, MAC, token or OTP being checked against, and the
      * user value is a submitted credential. Neither may reach a stack trace.
      *
+     * An empty known value never matches. A blank known value is a missing secret
+     * (an unset env var), and an empty submission, or `false` from a non-strict
+     * caller, would otherwise satisfy it. It fails closed with `false` rather than
+     * throwing, so a host's check answers with a refusal, not an error.
+     *
      * @param  string  $known  the trusted/expected value
      * @param  string  $user  the attacker-influenced value
      */
     public static function equals(#[SensitiveParameter] string $known, #[SensitiveParameter] string $user): bool
     {
-        return hash_equals($known, $user);
+        return $known !== '' && hash_equals($known, $user);
     }
 }

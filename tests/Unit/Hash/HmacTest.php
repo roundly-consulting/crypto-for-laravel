@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Crypto\Facades\Crypto;
 use RoundlyConsulting\Crypto\Hash\HashAlgorithm;
 use RoundlyConsulting\Crypto\Hash\Hmac;
+use RoundlyConsulting\Crypto\Signature\WeakKeyException;
 
 it('signs and verifies raw bytes', function (): void {
     $hmac = new Hmac(HashAlgorithm::Sha256);
@@ -48,4 +50,31 @@ it('matches the GitHub sha256= webhook framing', function (): void {
 it('honours the configured algorithm', function (): void {
     expect(strlen((new Hmac(HashAlgorithm::Sha512))->sign('x', 'k')))->toBe(64)
         ->and(strlen((new Hmac(HashAlgorithm::Sha1))->sign('x', 'k')))->toBe(20);
+});
+
+it('never verifies a MAC forged with the empty key', function (HashAlgorithm $algorithm): void {
+    // Anyone can compute a MAC under the empty key, so a blank configured webhook
+    // secret must refuse every signature instead of accepting a forgery.
+    $forged = hash_hmac($algorithm->value, 'attacker-body', '', true);
+
+    expect((new Hmac($algorithm))->verify('attacker-body', $forged, ''))->toBeFalse()
+        ->and(Crypto::hmac($algorithm)->verify('attacker-body', $forged, ''))->toBeFalse()
+        ->and((new Hmac($algorithm))->verify('attacker-body', '', ''))->toBeFalse();
+})->with(HashAlgorithm::cases());
+
+it('refuses to sign with an empty key', function (string $method): void {
+    expect(fn (): string => (new Hmac)->{$method}('payload', ''))
+        ->toThrow(WeakKeyException::class, 'The HMAC secret is empty.')
+        ->and(fn (): string => Crypto::hmac()->{$method}('payload', ''))
+        ->toThrow(WeakKeyException::class, 'The HMAC secret is empty.');
+})->with(['sign', 'signHex']);
+
+it('keeps accepting a short non-empty key', function (): void {
+    // RFC 4231 test case 2 uses the four-byte key "Jefe": Hmac takes any non-empty
+    // key, and only HmacSecret (the HS-family JOSE path) enforces 32 bytes.
+    $hmac = new Hmac;
+
+    expect($hmac->signHex('what do ya want for nothing?', 'Jefe'))
+        ->toBe('5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843')
+        ->and($hmac->verify('x', $hmac->sign('x', 'k'), 'k'))->toBeTrue();
 });

@@ -6,6 +6,19 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 
 ## Unreleased
 
+### Changed
+
+- `Hmac` signing with an empty key throws: `Hmac::sign()` and `Hmac::signHex()` (and so
+  `Crypto::hmac()->sign()` / `signHex()`) raise `Signature\WeakKeyException` ("The HMAC secret
+  is empty."), the same exception `HmacSecret::fromString('')` throws. A blank secret is never
+  valid. Any non-empty key still works; the 32-byte floor stays on `HmacSecret` only.
+
+### Security
+
+- `ConstantTime::equals()` / `constantTimeEquals()` never match an empty known value, and `Hmac`
+  verification with an empty key fails, so a blank configured secret can no longer be satisfied by
+  an empty submission or a MAC forged with the empty key.
+
 ## 1.2.0 - 2026-10-11
 
 ### Added
