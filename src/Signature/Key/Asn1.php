@@ -105,7 +105,8 @@ final class Asn1
             $length >>= 8;
         }
 
-        return chr(0x80 | strlen($bytes)).$bytes;
+        // At most 8 length bytes, so the prefix is a single byte; the mask states it for chr().
+        return chr((0x80 | strlen($bytes)) & 0xFF).$bytes;
     }
 
     private static function pem(string $der): string

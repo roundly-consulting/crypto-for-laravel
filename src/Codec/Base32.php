@@ -105,7 +105,8 @@ final class Base32
         $bytes = '';
 
         foreach (str_split(substr($binary, 0, strlen($binary) - $remainder), 8) as $chunk) {
-            $bytes .= chr((int) bindec($chunk));
+            // An 8-bit chunk is always 0-255; the mask states it for chr()'s byte range.
+            $bytes .= chr((int) bindec($chunk) & 0xFF);
         }
 
         return $bytes;
