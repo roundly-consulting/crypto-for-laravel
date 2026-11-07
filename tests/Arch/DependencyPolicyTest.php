@@ -18,9 +18,9 @@ it('declares ext-sodium as a suggestion, never a hard requirement', function ():
         ->and($composer['suggest'] ?? [])->toHaveKey('ext-sodium');
 });
 
-it('keeps supporting the latest two Laravel majors', function (): void {
+it('supports the latest Laravel major', function (): void {
     /** @var array{require?: array<string, string>} $composer */
     $composer = json_decode((string) file_get_contents(__DIR__.'/../../composer.json'), true, 512, JSON_THROW_ON_ERROR);
 
-    expect($composer['require']['illuminate/contracts'] ?? '')->toBe('^12.0|^13.0');
+    expect($composer['require']['illuminate/contracts'] ?? '')->toBe('^13.0');
 });

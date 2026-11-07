@@ -26,8 +26,8 @@ argument, and every primitive works on its own.
 
 ## Installation
 
-Requires PHP 8.4 (`ext-openssl`, `ext-hash`, `ext-mbstring`; `ext-sodium` for Ed25519), Laravel 12
-or 13.
+Requires PHP 8.4 (`ext-openssl`, `ext-hash`, `ext-mbstring`; `ext-sodium` for Ed25519) and
+Laravel 13.
 
 ```bash
 composer require roundly-consulting/crypto-for-laravel
