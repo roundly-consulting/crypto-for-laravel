@@ -76,8 +76,11 @@ function expectedSensitiveParameters(): array
         'CryptoManager::provisioningUri($secret)',
         'Hash\ConstantTime::equals($known)',
         'Hash\ConstantTime::equals($user)',
+        'Hash\Digest::context($pepper)',
+        'Hash\Digest::file($pepper)',
         'Hash\Digest::hex($data)',
         'Hash\Digest::raw($data)',
+        'Hash\Digest::stream($pepper)',
         'Hash\Digest::withPepper($data)',
         'Hash\Digest::withPepper($pepper)',
         'Hash\Hkdf::derive($ikm)',
@@ -241,5 +244,5 @@ it('marks every parameter named like a secret', function (): void {
 it('takes its inventory from the real source tree', function (): void {
     // Non-vacuous: an empty or broken scan would pass the three checks above.
     expect(count(sensitiveParameterInventory()))->toBeGreaterThan(300)
-        ->and(expectedSensitiveParameters())->toHaveCount(112);
+        ->and(expectedSensitiveParameters())->toHaveCount(115);
 });

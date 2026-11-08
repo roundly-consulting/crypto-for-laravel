@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Storage;
 use RoundlyConsulting\Crypto\CryptoManager;
 use RoundlyConsulting\Crypto\Facades\Crypto;
+use RoundlyConsulting\Crypto\Hash\HashAlgorithm;
+use RoundlyConsulting\Crypto\Hash\UnreadableInputException;
 use RoundlyConsulting\Crypto\Random\Csprng;
 use RoundlyConsulting\Crypto\Random\InvalidLengthException;
 use RoundlyConsulting\Crypto\Signature\Algorithm;
@@ -322,6 +324,24 @@ describe('Crypto::ecDer()', function (): void {
 
         Crypto::ecDer()->fromRaw('short');
     })->throws(InvalidSignatureException::class);
+});
+
+describe('Crypto::digest()', function (): void {
+    it('digests a file and a disk stream in the sha-256 hex the string digest gives', function (): void {
+        Storage::disk('keys')->put('import.csv', "name,email\nAda,ada@example.com\n");
+        $contents = Storage::disk('keys')->get('import.csv');
+        $stream = Storage::disk('keys')->readStream('import.csv');
+
+        expect(Crypto::digest()->file(Storage::disk('keys')->path('import.csv')))->toBe(Crypto::digest()->hex($contents))
+            ->and(Crypto::digest()->stream($stream))->toBe(hash('sha256', $contents))
+            ->and(Crypto::digest(HashAlgorithm::Sha512)->stream(Storage::disk('keys')->readStream('import.csv'), 'pepper'))
+            ->toBe(Crypto::digest(HashAlgorithm::Sha512)->withPepper($contents, 'pepper'))
+            ->and(is_resource($stream))->toBeTrue();
+    });
+
+    it('fails with the digest\'s typed error', function (): void {
+        Crypto::digest()->file(Storage::disk('keys')->path('missing.csv'));
+    })->throws(UnreadableInputException::class);
 });
 
 it('keeps the flat shortcuts on the same code path as the sub-accessors', function (): void {

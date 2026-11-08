@@ -6,6 +6,21 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 
 ## Unreleased
 
+### Added
+
+- `Crypto::digest()->file($path, $pepper = null)` and `Crypto::digest()->stream($stream, $pepper = null)`
+  (`Hash\Digest::file()` / `stream()`): the lower-case hex digest of a file or stream, read in
+  fixed-size chunks so memory stays flat for any input size. Same value as `hex()` /
+  `withPepper()` for the same bytes, for every `HashAlgorithm`; the optional pepper keys an HMAC
+  exactly as `withPepper()` does (only `null` is plain, an empty pepper stays keyed) and is
+  `#[SensitiveParameter]`. Hex only: hex-decode the result for raw bytes.
+- `stream()` reads from the stream's current position to its end, never rewinds and never closes
+  the caller's stream (it is left at its end). `file()` opens anything `fopen()` reads and closes
+  its own handle.
+- `Hash\UnreadableInputException` (a `CryptoException`): thrown instead of a partial digest for an
+  empty or NUL-byte path, a missing file, a directory, a file that cannot be opened, a value that
+  is not an open stream, a directory handle, a write-only stream, or a read that stops early.
+
 ## 2.0.0 - 2026-11-07
 
 ### Changed
