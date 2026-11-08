@@ -6,6 +6,8 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 
 ## Unreleased
 
+## 2.1.0 - 2026-11-08
+
 ### Added
 
 - `Crypto::digest()->file($path, $pepper = null)` and `Crypto::digest()->stream($stream, $pepper = null)`
@@ -20,6 +22,11 @@ All notable changes to `crypto-for-laravel` are documented in this file. The for
 - `Hash\UnreadableInputException` (a `CryptoException`): thrown instead of a partial digest for an
   empty or NUL-byte path, a missing file, a directory, a file that cannot be opened, a value that
   is not an open stream, a directory handle, a write-only stream, or a read that stops early.
+
+### Changed
+
+- Maintenance: the PHP 8.6 test job runs on Laravel 13.32 or later (earlier 13.x releases predate
+  PHP 8.6).
 
 ## 2.0.0 - 2026-11-07
 
